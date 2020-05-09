@@ -8,8 +8,13 @@ edition = "2018"
 
 [dependencies]
 
-sprite-render = { version = "0.1", path = "../sprite-render" }
+sprite-render = { version = "0.1", path = "../sprite-render-rs" }
 winit = "0.22"
 rand = "0.7"
 image = "0.23"
 ezing = "0.2.1"
+
+[build-dependencies]
+
+rect_packer = "0.2"
+image = "0.23"

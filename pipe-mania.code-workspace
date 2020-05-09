@@ -1,10 +1,12 @@
 {
 	"folders": [
 		{
-			"path": "..\\sprite-render"
+			"name": "pipe-puzzle-rs",
+			"path": "."
 		},
 		{
-			"path": "."
+			"name": "sprite-render-rs",
+			"path": "..\\sprite-render-rs"
 		}
 	],
 	"settings": {}

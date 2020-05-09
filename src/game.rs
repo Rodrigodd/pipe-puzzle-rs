@@ -6,6 +6,10 @@ use rand::seq::index::sample;
 use std::f32::consts::PI;
 use std::collections::HashMap;
 
+use std::time::Instant;
+
+mod utils;
+
 use ezing::*;
 fn lerp(t: f32, a: f32, b: f32) -> f32 {
     a + (b-a)*t
@@ -17,21 +21,18 @@ const COLORS: &[[f32;4]] = &[
     [1.0, 0.5, 0.0, 1.0,], [1.0, 1.0, 1.0, 1.0], [0.7, 0.7, 0.7, 1.0], // orange, white, gray
     [0.6, 0.1, 0.0, 1.0,], [0.7, 0.7, 0.0, 1.0], [0.3, 0.3, 0.3, 1.0], // brown, dark_yellow, black
 ];
-const UV_RECTS: &[[f32;4]] = &[
-    [0.0, 0.0, 0.5, 1.0/3.0],
-    [0.5, 0.0, 0.5, 1.0/3.0],
-    [0.0, 1.0/3.0, 0.5, 1.0/3.0],
-    [0.5, 1.0/3.0, 0.5, 1.0/3.0],
-    [0.0, 2.0/3.0, 0.5, 1.0/3.0],
-    [0.5, 2.0/3.0, 0.5, 1.0/3.0]
-];
+
+mod atlas {
+    include!(concat!(env!("OUT_DIR"), "/atlas.rs"));
+    pub const PIPES: [[f32; 4]; 5] = [PIPE_ONE, PIPE_TWO_L, PIPE_TWO, PIPE_TREE, PIPE_FOUR];
+    pub const NUMBERS: [[f32; 4]; 10] = [N0, N1, N2, N3, N4, N5, N6, N7, N8, N9];
+}
 
 struct Pipe {
     dir: u8,
     kind: u8,
     sprite: SpriteInstance,
     angle: f32,
-    size: f32,
     previous_angle: f32,
     anim_time: f32,
     color_time: f32,
@@ -43,9 +44,8 @@ impl Pipe {
         Self {
             dir,
             kind,
-            sprite: SpriteInstance::new(x, y, size, size, texture, UV_RECTS[kind as usize]),
+            sprite: SpriteInstance::new(x, y, size, size, texture, atlas::PIPES[kind as usize]),
             angle: 0.0,
-            size,
             previous_angle: 0.0,
             anim_time: 0.000001,
             color_time: 0.000001,
@@ -60,7 +60,7 @@ impl Pipe {
             let d = ((self.dir as f32 * PI/2.0) - self.previous_angle + PI).rem_euclid(2.0*PI) - PI;
             let t = elastic_out(1.0 - self.anim_time);
             self.angle = self.previous_angle + lerp(t, 0.0, d);
-            self.sprite.set_transform(self.size, self.size, self.angle);
+            self.sprite.set_angle(self.angle);
         }
         if self.color_time != 0.0 {
             self.color_time = (self.color_time - dt*3.0).max(0.0);
@@ -96,54 +96,28 @@ impl Pipe {
     }
 }
 
-pub struct Game<R: Rng> {
-    start_button: SpriteInstance,
-    close_button: SpriteInstance,
-    board: GameBoard<R>,
-    in_menu: bool,
+#[derive(Default)]
+pub struct Input {
+    pub mouse_x: f32,
+    pub mouse_y: f32,
+    pub mouse_left_state: u8,
+    pub mouse_rigth_state: u8,
 }
-impl<R: Rng> Game<R> {
-
-    pub fn new(texture: u32, rng: R) -> Self {
-        Self {
-            start_button: SpriteInstance::new(0.0, -0.5, 1.4, 0.5, texture, UV_RECTS[4]),
-            close_button: SpriteInstance::new(0.0, 0.5, 1.0, 0.5, texture, UV_RECTS[4]),
-            board: GameBoard::new(3, 3, texture, rng),
-            in_menu: true,
-        }
-    }
-
-    pub fn handle_click(&mut self, x: f32, y: f32, right: bool) {
-        if self.in_menu {
-            if y < 0.0 {
-                self.in_menu = false;
-            }
-        } else {
-            self.board.handle_click(x, y, right);
-        }
-    
-    }
-
-    pub fn update(&mut self, dt: f32) {
-        if self.in_menu {
-            // if y < 0.0 {
-            //     self.start_button.set_color([1.0, 0.4, 0.4, 1.0]);
-            //     self.close_button.set_color([1.0, 1.0, 1.0, 1.0]);
-            // } else {
-            //     self.close_button.set_color([1.0, 0.4, 0.4, 1.0]);
-            //     self.start_button.set_color([1.0, 1.0, 1.0, 1.0]);
-            // }
-        } else {
-            self.board.animate(dt);
-        }
-    }
-
-    pub fn get_sprites(&mut self) -> Vec<SpriteInstance> {
-        if self.in_menu {
-            vec![self.start_button.clone(), self.close_button.clone()]
-        } else {
-            self.board.get_sprites()
-        }
+impl Input {
+    /// update button state (from 'Pressed' to 'Down)
+    pub fn update(&mut self) {
+        self.mouse_left_state = match self.mouse_left_state {
+            0 => 0,
+            1 => 2,
+            3 => 1,
+            _ => 0,
+        };
+        self.mouse_rigth_state = match self.mouse_rigth_state {
+            0 => 0,
+            1 => 2,
+            3 => 1,
+            _ => 0,
+        };
     }
 }
 
@@ -155,31 +129,97 @@ struct GameBoard<R: Rng> {
     region_id_pool: Vec<u16>,
     number_regions: u16,
     region_size: HashMap<u16, u16>,
-    win_anim: f32,
-    win_sprite: SpriteInstance,
     texture: u32,
+    win_anim: f32,
+    lose_anim: f32,
+    win_sprite: SpriteInstance,
+    highlight_sprite: SpriteInstance,
+    again_button: Button,
+    level: u32,
+    life: u32,
+    life_time: f32,
+    life_dirty: bool,
+    life_text: SpriteInstance,
+    life_number: Vec<SpriteInstance>,
+    score: u32,
+    level_score: u32,
+    score_dirty: bool,
+    score_text: SpriteInstance,
+    score_number: Vec<SpriteInstance>,
+    click_count: u32,
+    expect_min_click_count: u32,
+    game_start: Instant,
+    level_start: Instant,
     rng: R,
 }
 impl<R: Rng> GameBoard<R> {
-
-    pub fn new(width: u8, height: u8, texture: u32, rng: R) -> Self {
+    pub fn new(texture: u32, rng: R) -> Self {
+        
+        let mut highlight_sprite = SpriteInstance::new(-100.0, 0.0, 1.0, 1.0, texture, atlas::BLANCK);
+        highlight_sprite.set_color([1.0, 1.0, 1.0, 0.25]);
         
         let mut this = Self {
-            width,
-            height,
+            width: 0,
+            height: 0,
             pipes: Vec::new(),
             regions: Vec::new(),
             region_id_pool: Vec::new(),
             number_regions: 0,
             region_size: HashMap::new(),
             win_anim: 0.0,
-            win_sprite: SpriteInstance::new(0.0, 0.0, 2.0, 2.0, texture, UV_RECTS[5]),
+            lose_anim: 0.0,
+            win_sprite: SpriteInstance::new(0.0, 0.0, 1.0, 1.0, texture, atlas::YOU_WIN),
+            highlight_sprite,
+            again_button: Button::new(
+                SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::PLAY_AGAIN)
+                    .with_color([1.0, 1.0, 0.0, 1.0]),
+                [-0.30, 0.30, -0.06, 0.06]
+            ),
             texture,
+            level: 0,
+            life: 10,
+            life_time: 1.0,
+            life_dirty: true,
+            life_text: SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::TIME)
+                .with_color([0.0, 1.0, 0.0, 1.0]),
+            life_number: Vec::new(),
+            score: 0,
+            level_score: 0,
+            score_dirty: true,
+            score_text: SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::SCORE)
+                .with_color([0.0, 1.0, 0.0, 1.0]),
+            score_number: Vec::new(),
+            click_count: 0,
+            expect_min_click_count: 0,
+            game_start: Instant::now(),
+            level_start: Instant::now(),
             rng,
         };
-        this.new_level(width, height);
+        this.reset();
         this
     }
+
+    pub fn reset(&mut self) {
+        self.win_anim = 0.0;
+        self.lose_anim = 0.0;
+        self.again_button.sprite.set_position(-10000000.0, -1000000.0);
+        self.level = 0;
+        self.life = 10;
+        self.life_time = 1.0;
+        self.life_dirty = true;
+        self.score = 10;
+        self.score_dirty = true;
+        self.click_count = 0;
+        self.game_start = Instant::now();
+
+        if self.life_text.get_x() > 1.0 {
+            self.resize(2.0, 1.0);
+        } else {
+            self.resize(1.0, 2.0);
+        }
+
+        self.new_level(4, 4);
+    } 
 
     fn new_level(&mut self, width: u8, height: u8) {
         self.width = width;
@@ -188,13 +228,23 @@ impl<R: Rng> GameBoard<R> {
         self.region_size.clear();
         self.number_regions = 0;
         self.pipes = Vec::with_capacity(width as usize * height as usize);
+        self.life_time = 1.0;
         let maze = Self::gen_maze(width, height, &mut self.rng);
         let mut i = 0usize;
         let size = 2.0 / self.height as f32;
+        self.highlight_sprite.set_size(size*0.9, size*0.9);
+
+        self.level_start = Instant::now();
+        self.click_count = 0;
+
+        self.level += 1;
+        self.level_score = 0;
+
+        let mut total_diff = 0u32;
         
         for y in 0..height {
             for x in 0..width {
-                let (kind, _dir) = match maze[i] {
+                let (kind, dir) = match maze[i] {
                     0b0001 => (0, 0),
                     0b0010 => (0, 1),
                     0b0100 => (0, 2),
@@ -217,18 +267,39 @@ impl<R: Rng> GameBoard<R> {
                     _ => (5, 0),
     
                 };
-                // answer.push(dir);
+
+                let diff = self.rng.gen_range(0, 4);
+                total_diff += if diff <= 2 { diff } else { 4 - diff};
+                
                 self.pipes.push(Pipe::new(
                     (x as f32 - width as f32 / 2.0) * size + size/2.0,
                     (y as f32 - height as f32 / 2.0) * size + size/2.0,
                     size,
                     self.texture, 
-                    kind, self.rng.gen_range(0, 1))
-                );
+                    kind,
+                    (dir + diff as u8) % 4
+                ));
                 i+=1;
             }
         }
         self.trace_regions();
+
+        self.expect_min_click_count = total_diff;
+        let area = self.width as u32 * self.height as u32;
+        // 4.39474344992316 + 
+        // 0.335140848886009*col("1") + 
+        // 0.00237509179338798*col("1")*col("1")
+        let expect_time =
+            -0.597584184256657 + 
+            0.517966152832989*area as f32 + 
+            0.00076228816742802*area as f32 * area as f32;
+        let expect_click = 
+            4.5791117546534 + 
+            0.652697187590514*area as f32 + 
+            0.00283512681609386*area as f32 * area as f32;
+        self.add_life((expect_time*2.0 + expect_click) as i32);
+        // self.life = (expect_time*2.0 + expect_click) as u32;
+        // self.life_dirty = true;
     }
 
     // preference == 0 mean no preference
@@ -327,9 +398,6 @@ impl<R: Rng> GameBoard<R> {
 
         let mut to_check: Vec<(usize, u16)> = Vec::with_capacity(5);
 
-        to_check.push((i as usize, self.regions[i as usize]));
-        self.regions[i as usize] = 0;
-
         for n in 0..4 {
             let next = (i + neights[n]) as usize;
             if (i % self.width as i32 - next as i32 % self.width as i32).abs() <= 1
@@ -342,6 +410,15 @@ impl<R: Rng> GameBoard<R> {
         to_check.sort_by_key(|(_, x)| {
             u16::max_value() - self.region_size.get(x).unwrap()
         });
+
+        to_check.push((i as usize, self.regions[i as usize]));
+        self.regions[i as usize] = 0;
+
+        // print!("to_check:");
+        // for (p, r) in to_check.iter() {
+        //     print!(" {:2} {:2};", p, r);
+        // }
+        // println!();
 
         for &(_, region) in to_check.iter() {
             self.add_region_to_pool(region);
@@ -507,60 +584,300 @@ impl<R: Rng> GameBoard<R> {
         true
     }
 
-    /// Receive the in world space coordinate of the mouse click.
-    /// When right is true it is a right mouse button click, otherwise is left.
-    pub fn handle_click(&mut self, x: f32, y: f32, right: bool) {
+    fn add_life(&mut self, value: i32) {
+        self.life_dirty = true;
+        self.life = (self.life as i32 + value).max(0) as u32;
+        if self.life == 0 && self.win_anim == 0.0 {
+            self.lose_anim = 1.0;
+        }
+    }
+
+    /// Receive the in world space coordinate of the mouse position.
+    /// 'pressed' is 0 if none, 1 if is left button, 2 if is rigth button
+    pub fn mouse_input(&mut self, x: f32, y: f32, pressed: u8) {
         if self.win_anim > 0.0 {
+            self.highlight_sprite.pos[0] = -100.0;
             return;
         }
-        let x = ((x + self.width as f32 / self.height as f32)/2.0 * self.height as f32) as u16;
-        let y = ((y + 1.0) / 2.0 * self.height as f32) as u16;
+        if self.lose_anim > 0.0 {
+            self.again_button.mouse_input(x, y);
+            
+            self.highlight_sprite.pos[0] = -100.0;
+            if pressed == 1 {
+                if self.again_button.is_over {
+                    self.reset();
+                }
+            }
+
+            return;
+        }
+
+        let x = ((x + self.width as f32 / self.height as f32)/2.0 * self.height as f32).floor() as u16;
+        let y = ((y + 1.0) / 2.0 * self.height as f32).floor() as u16;
         if x < self.width as u16 && y < self.height as u16 {
-            let i = y*self.width as u16 + x;
-            self.pipes[i as usize].click(right);
-            self.update_regions(i as i32);
-            if self.check_is_done() {
-                self.win_anim = 1.0;
+            if pressed == 0 {
+                self.highlight_sprite.pos = [
+                    2.0 * (x as f32 + 0.5) / self.width as f32 - 1.0,
+                    2.0 * (y as f32 + 0.5) / self.height as f32 - 1.0
+                ];
+            } else {
+                let i = y*self.width as u16 + x;
+                self.click_count += 1;
+                self.pipes[i as usize].click(pressed != 1);
+                self.update_regions(i as i32);
+                let new_max = *self.region_size.iter().max_by_key(|x| x.1).unwrap().1 as u32;
+                if new_max > self.level_score {
+                    self.score += new_max - self.level_score;
+                    self.level_score = new_max;
+                    self.score_dirty = true;
+                }
+                if self.check_is_done() {
+                    self.win_anim = 1.0;
+                }
+                self.add_life(-1);
+            }
+        } else {
+            self.highlight_sprite.pos[0] = -100.0;
+        }
+    }
+
+
+    pub fn animate(&mut self, dt: f32) {
+        if self.life_dirty {
+            self.life_number = utils::number_to_sprites(
+                self.life,
+                self.life_text.pos[0] + self.life_text.get_width() / 2.0,
+                self.life_text.pos[1],
+                self.life_text.get_height(),
+                [1.0, 0.0, 0.0, 1.0],
+                false,
+                self.texture
+            );
+        }
+
+        if self.score_dirty {
+            self.score_number = utils::number_to_sprites(
+                self.score,
+                self.score_text.pos[0] + self.score_text.get_width() / 2.0,
+                self.score_text.pos[1],
+                self.score_text.get_height(),
+                [1.0, 0.0, 0.0, 1.0],
+                false,
+                self.texture
+            );
+        }
+
+        for pipe in self.pipes.iter_mut() {
+            pipe.animate(dt);
+        }
+        if self.win_anim == 0.0 && self.lose_anim == 0.0 {
+            self.life_time -= dt;
+            if self.life_time < 0.0 {
+                self.add_life(-1);
+                self.life_time += 0.5;
+            }
+        } else if self.win_anim > 0.0 {
+            self.win_anim = (self.win_anim - dt*0.5).max(0.0);
+
+            let x = ((self.win_anim-0.5)*PI).tan()*0.5;
+            let angle = lerp(x, 0.0, PI/4.0);
+
+            self.win_sprite.set_uv_rect(atlas::YOU_WIN);
+            self.win_sprite.set_color([1.0, 1.0, 1.0, 1.0]);
+            self.win_sprite.set_angle(angle);
+            self.win_sprite.set_position(x, 0.0);
+
+            if self.win_anim == 0.0 {
+                use std::io::Write;
+                let mut file = std::fs::OpenOptions::new()
+                    .write(true)
+                    .append(true)
+                    .create(true)
+                    .open("log.txt").unwrap();
+
+                writeln!(file, "{},{},{},{},{}", self.width, self.height, self.expect_min_click_count, self.click_count, self.level_start.elapsed().as_secs_f32()).unwrap();
+                self.new_level(self.width + 1, self.height  + 1);
+            }
+        } else if self.lose_anim > 0.0 {
+            self.again_button.update(dt);
+            self.lose_anim = (self.lose_anim - dt*0.5).max(f32::MIN_POSITIVE);
+
+            let y = -0.2*(self.lose_anim*self.lose_anim)/(self.lose_anim-1.0);
+            self.win_sprite.set_uv_rect(atlas::YOU_LOSE);
+            self.win_sprite.set_color([1.0, 0.0, 0.0, 1.0]);
+            self.win_sprite.set_angle(0.0);
+            self.win_sprite.set_position(0.0, -y-0.4);
+
+            if self.lose_anim < 0.5 {
+                let t = self.lose_anim*2.0;
+                let y = -0.4*(t*t*4.0)/(t-1.0);
+                self.score_text.set_position(0.0, y + 0.5);
+                self.again_button.sprite.set_position(0.0, y*3.0 + 0.7);
+            } else {
+                let t = self.lose_anim - 1.0;
+                let d = t*t/(t + 0.5);
+                if self.score_text.get_x() > 1.0 {
+                    self.score_text.set_position(1.5 + d, -0.5);
+                } else {
+                    self.score_text.set_position(0.0, -1.3 - d);
+                }
             }
         }
     }
 
-    pub fn animate(&mut self, dt: f32) {
-        for pipe in self.pipes.iter_mut() {
-            pipe.animate(dt);
-        }
-        if self.win_anim > 0.0 {
-            self.win_anim = (self.win_anim - dt*0.5).max(0.0);
-
-            // this is a function that:
-            // f(1) = +infinite, 
-            // f(0.5) = 0,
-            // f(0) = -infinite,
-            // f'(0.5) = 0.15 (derivative)
-            // let x = (self.win_anim - 0.5) -
-            //     ((1.0/self.win_anim)*(1.0/(self.win_anim-1.0)) + 4.0) 
-            //     * if self.win_anim < 0.5 { -1.0 } else { 1.0 };
-            let x = ((self.win_anim-0.5)*PI).tan()*0.5;
-            let angle = lerp(x, 0.0, PI/4.0);
-
-            self.win_sprite.set_transform(1.0, 1.0, angle);
-            self.win_sprite.set_position(x, 0.0);
-
-            if self.win_anim == 0.0 {
-                self.new_level(self.width + 1, self.height  + 1);
-            }
+    pub fn resize(&mut self, width: f32, height: f32) {
+        if width > height {
+            self.life_text.set_position(1.5, -0.9);
+            self.score_text.set_position(1.5, -0.5);
+        } else {
+            self.life_text.set_position(-0.9, -1.3);
+            self.score_text.set_position(0.0, -1.3);
         }
     }
 
     pub fn get_sprites(&self) -> Vec<SpriteInstance> {
-        let mut sprites= Vec::with_capacity(self.pipes.len());
+        let mut sprites= Vec::with_capacity(self.pipes.len() + self.life_number.len() + 3);
+        sprites.push(self.highlight_sprite.clone());
         for pipe in self.pipes.iter() {
             sprites.push(pipe.sprite.clone());
         }
+        sprites.push(self.life_text.clone());
+        sprites.extend(self.life_number.iter().cloned());
+        sprites.push(self.score_text.clone());
+        sprites.extend(self.score_number.iter().cloned());
         if self.win_anim > 0.0 {
             sprites.push(self.win_sprite.clone());
         }
-
+        if self.lose_anim > 0.0 {
+            sprites.push(self.win_sprite.clone());
+            if self.lose_anim < 0.5 {
+                sprites.push(self.again_button.sprite.clone());
+            }
+        }
         sprites
+    }
+}
+
+struct Button {
+    sprite: SpriteInstance,
+    height: f32,
+    bounds: [f32; 4],
+    anim: f32,
+    is_over: bool,
+}
+impl Button {
+
+    fn new(sprite: SpriteInstance, bounds: [f32; 4]) -> Self {
+        Self {
+            height: sprite.get_height(),
+            sprite,
+            bounds,
+            anim: 0.0,
+            is_over: false,
+        }
+    }
+
+    fn mouse_input(&mut self, x: f32, y: f32) {
+        let left   = self.sprite.get_x() + self.bounds[0];
+        let rigth  = self.sprite.get_x() + self.bounds[1];
+        let top    = self.sprite.get_y() + self.bounds[2];
+        let bottom = self.sprite.get_y() + self.bounds[3];
+
+        self.is_over = x > left && x < rigth && y > top && y < bottom;
+    }
+
+    fn update(&mut self, dt: f32) {
+        let s = self.anim*0.1 + 1.0;
+        self.sprite.set_heigh_prop(self.height*s);
+        if self.is_over {
+            self.anim = (self.anim + dt*6.0).min(1.0);
+        } else {
+            self.anim = (self.anim - dt*6.0).max(0.0);
+        }
+    }
+}
+
+pub struct Game<R: Rng> {
+    background_painel: SpriteInstance,
+    start_button: Button,
+    close_button: Button,
+    back_button: Button,
+    board: GameBoard<R>,
+    in_menu: bool,
+}
+impl<R: Rng> Game<R> {
+
+    pub fn new(texture: u32, rng: R) -> Self {
+        Self {
+            background_painel: SpriteInstance::new(0.0, 0.0, 2.2, 2.2, texture, atlas::PAINEL),
+            start_button: Button::new(
+                SpriteInstance::new_height_prop(0.0, 0.0, 0.5, texture, atlas::START_BUTTON),
+                [-0.62, 0.62, -0.20, 0.20],
+            ),
+            close_button: Button::new(
+                SpriteInstance::new_height_prop(0.0, 0.5, 0.25, texture, atlas::CLOSE_BUTTON),
+                [-0.65, 0.65, -0.20, 0.20],
+            ),
+            back_button: Button::new(
+                SpriteInstance::new_height_prop(0.0, 0.5, 0.25, texture, atlas::ARROW)
+                    .with_color([0.0, 1.0, 0.0, 1.0]),
+                [-0.12, 0.12, -0.12, 0.12],
+            ),
+            board: GameBoard::new(texture, rng),
+            in_menu: true,
+        }
+    }
+
+    pub fn update(&mut self, dt: f32, input: &Input) {
+        if self.in_menu {
+            self.start_button.mouse_input(input.mouse_x, input.mouse_y);
+            self.start_button.update(dt);
+            self.close_button.mouse_input(input.mouse_x, input.mouse_y);
+            self.close_button.update(dt);
+            if input.mouse_left_state == 3 {
+                if self.start_button.is_over { 
+                    self.in_menu = false;
+                    self.board.reset();
+                } else if self.close_button.is_over { 
+                    std::process::exit(0);
+                }
+            }
+        } else {
+            self.back_button.mouse_input(input.mouse_x, input.mouse_y);
+            self.back_button.update(dt);
+
+            if input.mouse_left_state == 3 {
+                if self.back_button.is_over { 
+                    self.in_menu = true;
+                }
+            }
+
+            self.board.mouse_input(input.mouse_x, input.mouse_y, if input.mouse_left_state == 3 {
+                    1
+                } else if input.mouse_rigth_state == 3 {
+                    2
+                } else { 0 }
+            );
+            self.board.animate(dt);
+        }
+    }
+
+    pub fn resize(&mut self, width: f32, height: f32) {
+        self.board.resize(width, height);
+        if width > height {
+            self.back_button.sprite.set_position(-1.5, -0.9);
+        } else {
+            self.back_button.sprite.set_position(-0.9, -1.6);
+        }
+    }
+
+    pub fn get_sprites(&mut self) -> Vec<SpriteInstance> {
+        if self.in_menu {
+            vec![self.background_painel.clone(), self.start_button.sprite.clone(), self.close_button.sprite.clone()]
+        } else {
+            let mut vec = vec![self.background_painel.clone(), self.back_button.sprite.clone()];
+            vec.append(&mut self.board.get_sprites());
+            vec
+        }
     }
 }

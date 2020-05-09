@@ -1,0 +1,7 @@
+pipe_one      0   0  128 128
+pipe_two_l  128   0  128 128
+pipe_two      0 128  128 128
+pipe_tree   128 128  128 128
+pipe_four     0 256  128 128
+you_win     128 256  128 128
+blanck      148 276  1 1
