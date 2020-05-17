@@ -1,4 +1,4 @@
-use sprite_render::{ SpriteRender, Camera };
+use sprite_render::{ default_render, Camera };
 
 use winit::{
     event_loop::EventLoop,
@@ -7,28 +7,37 @@ use winit::{
     dpi::{ LogicalSize, PhysicalPosition }
 };
 
+mod time;
+use time::Instant;
+
 mod game;
 use game::Game;
 
 fn main() {
-
     let events_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("Hello world!")
         .with_inner_size(LogicalSize::new(1280.0*0.8, 720.0*0.8));
     
     // create the SpriteRender
-    let (window, mut render) = SpriteRender::new(wb, &events_loop, true);
+    let (window, mut render) = default_render(wb, &events_loop, true);
     let pipe_texture = {
-        let image = image::open(concat!(env!("OUT_DIR"), "/atlas.png")).expect("File not Found!").to_rgba();
+        let image = image::load_from_memory(
+            include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png"))
+        ).expect("File not Found!").to_rgba();
+
         render.load_texture(image.width(), image.height(), image.into_raw().as_slice(), true)
     };
-    
-    let mut game = Game::new(pipe_texture, rand::thread_rng());
+    use rand::SeedableRng;
+    let mut game = Game::new(
+        pipe_texture,
+        rand::rngs::SmallRng::seed_from_u64(
+            time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_millis() as u64
+        )
+    );
     let mut camera = Camera::new(window.inner_size(), 2.2);
     camera.set_position(0.0, 0.0);
 
-    use std::time::{ Instant };
     let mut clock = Instant::now();
     let mut frame_count = 0;
 
@@ -71,10 +80,10 @@ fn main() {
                         input.mouse_y = y;
                     }
                     WindowEvent::Resized(size) => {
-                        render.resize(size);
+                        render.resize(size.width, size.height);
                         camera.resize(size);
                         game.resize(size.width as f32, size.height as f32);
-                        game.update(0.0, &game::Input::default());
+                        // game.update(0.0, &game::Input::default());
                     }
                     _ => (),
                 }
@@ -96,7 +105,10 @@ fn main() {
                         60.0/elapsed)
                     );
                 }
-                render.draw(&mut camera, &game.get_sprites());
+                render.render()
+                    .clear_screen(&[0.0f32, 0.3, 0.0, 1.0])
+                    .draw_sprites(&mut camera, &game.get_sprites())
+                    .finish();
             }
             _ => ()
         }

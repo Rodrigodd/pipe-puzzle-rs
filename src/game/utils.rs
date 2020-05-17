@@ -1,7 +1,7 @@
 use sprite_render::SpriteInstance;
 use super::atlas::NUMBERS;
 
-pub fn number_to_sprites(number: u32, x: f32, y: f32, scale: f32, color: [f32; 4], center: bool, texture: u32) -> Vec<SpriteInstance> {
+pub fn number_to_sprites(number: u32, x: f32, y: f32, scale: f32, color: [u8; 4], center: bool, texture: u32) -> Vec<SpriteInstance> {
     let string = number.to_string();
     let mut sprites = Vec::with_capacity(string.len());
     let mut pos = scale/2.0;

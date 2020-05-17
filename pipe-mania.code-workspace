@@ -9,5 +9,10 @@
 			"path": "..\\sprite-render-rs"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "pipe-puzzle-rs",
+		"liveServer.settings.ignoreFiles": [
+			"**",
+		]
+	},
 }

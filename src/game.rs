@@ -6,7 +6,7 @@ use rand::seq::index::sample;
 use std::f32::consts::PI;
 use std::collections::HashMap;
 
-use std::time::Instant;
+use crate::time::Instant;
 
 mod utils;
 
@@ -15,11 +15,11 @@ fn lerp(t: f32, a: f32, b: f32) -> f32 {
     a + (b-a)*t
 }
 
-const COLORS: &[[f32;4]] = &[
-    [1.0, 0.0, 0.0, 1.0,], [0.0, 1.0, 0.0, 1.0], [0.0, 0.0, 1.0, 1.0], // red, green, ~blue
-    [1.0, 1.0, 0.0, 1.0,], [1.0, 0.0, 1.0, 1.0], [0.0, 1.0, 1.0, 1.0], // yellow, purple, cyan
-    [1.0, 0.5, 0.0, 1.0,], [1.0, 1.0, 1.0, 1.0], [0.7, 0.7, 0.7, 1.0], // orange, white, gray
-    [0.6, 0.1, 0.0, 1.0,], [0.7, 0.7, 0.0, 1.0], [0.3, 0.3, 0.3, 1.0], // brown, dark_yellow, black
+const COLORS: &[[u8; 4]] = &[
+    [0xff, 0x00, 0x00, 0xff], [0x00, 0xff, 0x00, 0xff], [0x00, 0x00, 0xff, 0xff], // red, green, ~blue
+    [0xff, 0xff, 0x00, 0xff], [0xff, 0x00, 0xff, 0xff], [0x00, 0xff, 0xff, 0xff], // yellow, purple, cyan
+    [0xff, 0x7f, 0x00, 0xff], [0xff, 0xff, 0xff, 0xff], [0xb2, 0xb2, 0xb2, 0xff], // orange, white, gray
+    [0x99, 0x16, 0x00, 0xff], [0xb2, 0xb2, 0x00, 0xff], [0x48, 0x48, 0x48, 0xff], // brown, dark_yellow, black
 ];
 
 mod atlas {
@@ -36,7 +36,7 @@ struct Pipe {
     previous_angle: f32,
     anim_time: f32,
     color_time: f32,
-    previous_color: [f32; 4],
+    previous_color: [u8; 4],
     target_color: u16,
 }
 impl Pipe {
@@ -49,7 +49,7 @@ impl Pipe {
             previous_angle: 0.0,
             anim_time: 0.000001,
             color_time: 0.000001,
-            previous_color: [0.0; 4],
+            previous_color: [0; 4],
             target_color: 0,
         }
     }
@@ -66,10 +66,10 @@ impl Pipe {
             self.color_time = (self.color_time - dt*3.0).max(0.0);
             let t = 1.0 - self.color_time;
             let color = [
-                lerp(t, self.previous_color[0], COLORS[self.target_color as usize % COLORS.len()][0]),
-                lerp(t, self.previous_color[1], COLORS[self.target_color as usize % COLORS.len()][1]),
-                lerp(t, self.previous_color[2], COLORS[self.target_color as usize % COLORS.len()][2]),
-                1.0,
+                lerp(t, self.previous_color[0] as f32, COLORS[self.target_color as usize % COLORS.len()][0] as f32) as u8,
+                lerp(t, self.previous_color[1] as f32, COLORS[self.target_color as usize % COLORS.len()][1] as f32) as u8,
+                lerp(t, self.previous_color[2] as f32, COLORS[self.target_color as usize % COLORS.len()][2] as f32) as u8,
+                255,
             ];
             self.sprite.set_color(color);
         }
@@ -156,7 +156,7 @@ impl<R: Rng> GameBoard<R> {
     pub fn new(texture: u32, rng: R) -> Self {
         
         let mut highlight_sprite = SpriteInstance::new(-100.0, 0.0, 1.0, 1.0, texture, atlas::BLANCK);
-        highlight_sprite.set_color([1.0, 1.0, 1.0, 0.25]);
+        highlight_sprite.set_color([255, 255, 255, 64]);
         
         let mut this = Self {
             width: 0,
@@ -172,7 +172,7 @@ impl<R: Rng> GameBoard<R> {
             highlight_sprite,
             again_button: Button::new(
                 SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::PLAY_AGAIN)
-                    .with_color([1.0, 1.0, 0.0, 1.0]),
+                    .with_color([255, 255, 0, 255]),
                 [-0.30, 0.30, -0.06, 0.06]
             ),
             texture,
@@ -181,13 +181,13 @@ impl<R: Rng> GameBoard<R> {
             life_time: 1.0,
             life_dirty: true,
             life_text: SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::TIME)
-                .with_color([0.0, 1.0, 0.0, 1.0]),
+                .with_color([0, 255, 0, 255]),
             life_number: Vec::new(),
             score: 0,
             level_score: 0,
             score_dirty: true,
             score_text: SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::SCORE)
-                .with_color([0.0, 1.0, 0.0, 1.0]),
+                .with_color([0, 255, 0, 255]),
             score_number: Vec::new(),
             click_count: 0,
             expect_min_click_count: 0,
@@ -207,7 +207,7 @@ impl<R: Rng> GameBoard<R> {
         self.life = 10;
         self.life_time = 1.0;
         self.life_dirty = true;
-        self.score = 10;
+        self.score = 0;
         self.score_dirty = true;
         self.click_count = 0;
         self.game_start = Instant::now();
@@ -516,6 +516,7 @@ impl<R: Rng> GameBoard<R> {
             return false;
         }
 
+        // upper row
         for curr in 0..self.width as i32 {
             let curr_dir = match self.pipes[curr as usize].kind {
                 0 => 0b00010001u8,
@@ -531,6 +532,7 @@ impl<R: Rng> GameBoard<R> {
             }
         }
 
+        // left column
         for curr in (0..(self.width as i32 * self.height as i32)).step_by(self.width as usize) {
             let curr_dir = match self.pipes[curr as usize].kind {
                 0 => 0b00010001u8,
@@ -584,6 +586,46 @@ impl<R: Rng> GameBoard<R> {
         true
     }
 
+    fn count_connections(&self) -> u32 {
+        let neights: [i32; 2] = [1, self.width as i32];
+        let mut count = 0;
+        
+        for curr in 0..(self.width as i32 * (self.height as i32)) {
+
+            let curr_dir = match self.pipes[curr as usize].kind {
+                0 => 0b00010001u8,
+                1 => 0b00110011,
+                2 => 0b01010101,
+                3 => 0b11101110,
+                4 => 0b11111111,
+                _ => 0,
+            }.rotate_left(self.pipes[curr as usize].dir as u32);
+
+            for i in 0..2 {
+                let next = (curr + neights[i]) as usize;
+                if (curr % self.width as i32 - next as i32 % self.width as i32).abs() <= 1
+                && next < self.regions.len() {
+                    let next_dir = match self.pipes[next as usize].kind {
+                        0 => 0b00010001u8,
+                        1 => 0b00110011,
+                        2 => 0b01010101,
+                        3 => 0b11101110,
+                        4 => 0b11111111,
+                        _ => 0,
+                    }.rotate_left(self.pipes[next as usize].dir as u32 + 2);
+
+                    // If curr and next have a paried connection, count it
+                    if (curr_dir & (1<<i) != 0) && (next_dir & (1<<i) != 0) {
+                        count += 1;
+                        println!("{:2}: ({:2},{:2})", count, curr%self.width as i32, curr/self.width as i32);
+                    }
+                }
+            }
+        }
+        println!("counted {:2} connections", count);
+        count
+    }
+
     fn add_life(&mut self, value: i32) {
         self.life_dirty = true;
         self.life = (self.life as i32 + value).max(0) as u32;
@@ -625,7 +667,7 @@ impl<R: Rng> GameBoard<R> {
                 self.click_count += 1;
                 self.pipes[i as usize].click(pressed != 1);
                 self.update_regions(i as i32);
-                let new_max = *self.region_size.iter().max_by_key(|x| x.1).unwrap().1 as u32;
+                let new_max = self.count_connections();
                 if new_max > self.level_score {
                     self.score += new_max - self.level_score;
                     self.level_score = new_max;
@@ -649,7 +691,7 @@ impl<R: Rng> GameBoard<R> {
                 self.life_text.pos[0] + self.life_text.get_width() / 2.0,
                 self.life_text.pos[1],
                 self.life_text.get_height(),
-                [1.0, 0.0, 0.0, 1.0],
+                [255, 0, 0, 255],
                 false,
                 self.texture
             );
@@ -661,7 +703,7 @@ impl<R: Rng> GameBoard<R> {
                 self.score_text.pos[0] + self.score_text.get_width() / 2.0,
                 self.score_text.pos[1],
                 self.score_text.get_height(),
-                [1.0, 0.0, 0.0, 1.0],
+                [255, 0, 0, 255],
                 false,
                 self.texture
             );
@@ -683,19 +725,20 @@ impl<R: Rng> GameBoard<R> {
             let angle = lerp(x, 0.0, PI/4.0);
 
             self.win_sprite.set_uv_rect(atlas::YOU_WIN);
-            self.win_sprite.set_color([1.0, 1.0, 1.0, 1.0]);
+            self.win_sprite.set_color([255, 255, 255, 255]);
             self.win_sprite.set_angle(angle);
             self.win_sprite.set_position(x, 0.0);
 
             if self.win_anim == 0.0 {
-                use std::io::Write;
-                let mut file = std::fs::OpenOptions::new()
-                    .write(true)
-                    .append(true)
-                    .create(true)
-                    .open("log.txt").unwrap();
-
-                writeln!(file, "{},{},{},{},{}", self.width, self.height, self.expect_min_click_count, self.click_count, self.level_start.elapsed().as_secs_f32()).unwrap();
+                #[cfg(not(target_arch = "wasm32"))]{
+                    use std::io::Write;
+                    let mut file = std::fs::OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .create(true)
+                        .open("log.txt").unwrap();
+                    writeln!(file, "{},{},{},{},{}", self.width, self.height, self.expect_min_click_count, self.click_count, self.level_start.elapsed().as_secs_f32()).unwrap();
+                }
                 self.new_level(self.width + 1, self.height  + 1);
             }
         } else if self.lose_anim > 0.0 {
@@ -704,7 +747,7 @@ impl<R: Rng> GameBoard<R> {
 
             let y = -0.2*(self.lose_anim*self.lose_anim)/(self.lose_anim-1.0);
             self.win_sprite.set_uv_rect(atlas::YOU_LOSE);
-            self.win_sprite.set_color([1.0, 0.0, 0.0, 1.0]);
+            self.win_sprite.set_color([255, 0, 0, 255]);
             self.win_sprite.set_angle(0.0);
             self.win_sprite.set_position(0.0, -y-0.4);
 
@@ -820,7 +863,7 @@ impl<R: Rng> Game<R> {
             ),
             back_button: Button::new(
                 SpriteInstance::new_height_prop(0.0, 0.5, 0.25, texture, atlas::ARROW)
-                    .with_color([0.0, 1.0, 0.0, 1.0]),
+                    .with_color([0, 255, 0, 255]),
                 [-0.12, 0.12, -0.12, 0.12],
             ),
             board: GameBoard::new(texture, rng),
