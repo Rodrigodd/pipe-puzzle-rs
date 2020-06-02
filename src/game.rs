@@ -680,19 +680,19 @@ impl<R: Rng> GameBoard<R> {
             return;
         }
         
-        let x = ((x + self.width as f32 / self.height as f32)/2.0 * self.height as f32).floor() as u16;
-        let y = ((y + 1.0) / 2.0 * self.height as f32).floor() as u16;
-        if x < self.width as u16 && y < self.height as u16 {
+        let x = ((x + self.width as f32 / self.height as f32)/2.0 * self.height as f32).floor() as i32;
+        let y = ((y + 1.0) / 2.0 * self.height as f32).floor() as i32;
+        if x >= 0 && x < self.width as i32 && y >= 0 && y < self.height as i32 {
             if pressed == 0 {
                 self.highlight_sprite.pos = [
                     2.0 * (x as f32 + 0.5) / self.width as f32 - 1.0,
                     2.0 * (y as f32 + 0.5) / self.height as f32 - 1.0
                 ];
             } else {
-                let i = y*self.width as u16 + x;
+                let i = y*self.width as i32 + x;
                 self.click_count += 1;
                 self.pipes[i as usize].click(pressed != 1);
-                self.update_regions(i as i32);
+                self.update_regions(i);
                 let new_max = self.count_connections();
                 if new_max > self.level_score {
                     self.score += new_max - self.level_score;
