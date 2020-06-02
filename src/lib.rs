@@ -7,7 +7,7 @@ mod wasm {
     use wasm_bindgen::prelude::*;
     use std::panic;
 
-    #[wasm_bindgen(start)]
+    #[wasm_bindgen]
     pub fn run() {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
         super::main();

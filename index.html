@@ -6,7 +6,19 @@
     <script defer="defer" type="module">
         import init, { run } from './pkg/pipe_puzzle.js';
 
-        init().then(() => run());
+        // init().then(() => run());
+        
+        init().then(() => {
+            document.onclick = (() => {
+                var executed = false;
+                return () => {
+                    if (!executed) {
+                        executed = true;
+                        run();
+                    }
+                };
+            })();
+        });
     </script>
 </head>
 

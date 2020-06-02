@@ -24,6 +24,7 @@ webgl = ["sprite-render/webgl"]
 
 cfg-if = "0.1"
 sprite-render = { version = "0.1", path = "../sprite-render-rs" }
+audio-engine = { version = "0.1", path = "../audio-engine"}
 winit = "0.22"
 rand = { version = "0.7", features = ["small_rng"] }
 image = "0.23"

@@ -1,10 +1,12 @@
 use sprite_render::SpriteInstance;
+use audio_engine::{ WavDecoder };
 
 use rand::Rng;
 use rand::seq::index::sample;
 
 use std::f32::consts::PI;
 use std::collections::HashMap;
+use std::io::Cursor;
 
 use crate::time::Instant;
 
@@ -26,6 +28,11 @@ mod atlas {
     include!(concat!(env!("OUT_DIR"), "/atlas.rs"));
     pub const PIPES: [[f32; 4]; 5] = [PIPE_ONE, PIPE_TWO_L, PIPE_TWO, PIPE_TREE, PIPE_FOUR];
     pub const NUMBERS: [[f32; 4]; 10] = [N0, N1, N2, N3, N4, N5, N6, N7, N8, N9];
+}
+
+mod sounds {
+    pub static CLICK: &[u8] = include_bytes!("../res/sound/click.wav");
+    pub static WHOOSH: &[u8] = include_bytes!("../res/sound/whoosh.wav");
 }
 
 struct Pipe {
@@ -83,6 +90,9 @@ impl Pipe {
         } else {
             self.dir = (self.dir + 4 - 1)%4;
         }
+        crate::audio_engine().new_sound(
+            WavDecoder::new(Cursor::new(sounds::CLICK))
+        ).unwrap().play();
         self.anim_time = 1.0;
         self.previous_angle = self.angle;
     }
@@ -198,6 +208,8 @@ impl<R: Rng> GameBoard<R> {
         this.reset();
         this
     }
+
+    
 
     pub fn reset(&mut self) {
         self.win_anim = 0.0;
@@ -617,12 +629,10 @@ impl<R: Rng> GameBoard<R> {
                     // If curr and next have a paried connection, count it
                     if (curr_dir & (1<<i) != 0) && (next_dir & (1<<i) != 0) {
                         count += 1;
-                        println!("{:2}: ({:2},{:2})", count, curr%self.width as i32, curr/self.width as i32);
                     }
                 }
             }
         }
-        println!("counted {:2} connections", count);
         count
     }
 
@@ -630,8 +640,24 @@ impl<R: Rng> GameBoard<R> {
         self.life_dirty = true;
         self.life = (self.life as i32 + value).max(0) as u32;
         if self.life == 0 && self.win_anim == 0.0 {
-            self.lose_anim = 1.0;
+            self.trigger_lose();
         }
+    }
+
+    fn trigger_lose(&mut self) {
+        self.lose_anim = 1.0;
+        self.win_sprite.set_uv_rect(atlas::YOU_LOSE);
+        self.win_sprite.set_color([255, 0, 0, 255]);
+        self.win_sprite.set_angle(0.0);
+    }
+
+    fn trigger_win(&mut self) {
+        self.win_anim = 1.0;
+        self.win_sprite.set_uv_rect(atlas::YOU_WIN);
+        self.win_sprite.set_color([255, 255, 255, 255]);
+        crate::audio_engine().new_sound(
+            WavDecoder::new(Cursor::new(sounds::WHOOSH))
+        ).unwrap().play();
     }
 
     /// Receive the in world space coordinate of the mouse position.
@@ -653,7 +679,7 @@ impl<R: Rng> GameBoard<R> {
 
             return;
         }
-
+        
         let x = ((x + self.width as f32 / self.height as f32)/2.0 * self.height as f32).floor() as u16;
         let y = ((y + 1.0) / 2.0 * self.height as f32).floor() as u16;
         if x < self.width as u16 && y < self.height as u16 {
@@ -674,7 +700,7 @@ impl<R: Rng> GameBoard<R> {
                     self.score_dirty = true;
                 }
                 if self.check_is_done() {
-                    self.win_anim = 1.0;
+                    self.trigger_win();
                 }
                 self.add_life(-1);
             }
@@ -682,7 +708,6 @@ impl<R: Rng> GameBoard<R> {
             self.highlight_sprite.pos[0] = -100.0;
         }
     }
-
 
     pub fn animate(&mut self, dt: f32) {
         if self.life_dirty {
@@ -724,8 +749,6 @@ impl<R: Rng> GameBoard<R> {
             let x = ((self.win_anim-0.5)*PI).tan()*0.5;
             let angle = lerp(x, 0.0, PI/4.0);
 
-            self.win_sprite.set_uv_rect(atlas::YOU_WIN);
-            self.win_sprite.set_color([255, 255, 255, 255]);
             self.win_sprite.set_angle(angle);
             self.win_sprite.set_position(x, 0.0);
 
@@ -746,9 +769,6 @@ impl<R: Rng> GameBoard<R> {
             self.lose_anim = (self.lose_anim - dt*0.5).max(f32::MIN_POSITIVE);
 
             let y = -0.2*(self.lose_anim*self.lose_anim)/(self.lose_anim-1.0);
-            self.win_sprite.set_uv_rect(atlas::YOU_LOSE);
-            self.win_sprite.set_color([255, 0, 0, 255]);
-            self.win_sprite.set_angle(0.0);
             self.win_sprite.set_position(0.0, -y-0.4);
 
             if self.lose_anim < 0.5 {
@@ -881,6 +901,9 @@ impl<R: Rng> Game<R> {
                 if self.start_button.is_over { 
                     self.in_menu = false;
                     self.board.reset();
+                    crate::audio_engine().new_sound(
+                        WavDecoder::new(Cursor::new(sounds::CLICK))
+                    ).unwrap().play();
                 } else if self.close_button.is_over { 
                     std::process::exit(0);
                 }

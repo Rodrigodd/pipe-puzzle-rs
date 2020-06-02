@@ -1,4 +1,7 @@
+use std::io::Cursor;
+
 use sprite_render::{ default_render, Camera };
+use audio_engine::{ AudioEngine, OggDecoder };
 
 use winit::{
     event_loop::EventLoop,
@@ -13,6 +16,19 @@ use time::Instant;
 mod game;
 use game::Game;
 
+fn audio_engine() -> &'static AudioEngine {
+    use std::sync::Once;
+    static mut AUDIO_ENGINE: Option<AudioEngine> = None;
+    static INIT: Once = Once::new();
+    INIT.call_once(|| unsafe {
+        AUDIO_ENGINE = Some(AudioEngine::new().unwrap())
+    });
+    unsafe {
+        AUDIO_ENGINE.as_ref().unwrap()
+    }
+}
+
+
 fn main() {
     let events_loop = EventLoop::new();
     let wb = WindowBuilder::new()
@@ -24,10 +40,17 @@ fn main() {
     let pipe_texture = {
         let image = image::load_from_memory(
             include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png"))
-        ).expect("File not Found!").to_rgba();
+        ).unwrap().to_rgba();
 
         render.load_texture(image.width(), image.height(), image.into_raw().as_slice(), true)
     };
+
+    let mut music = audio_engine().new_sound(
+            OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..]))
+        ).unwrap();
+    music.set_loop(true);
+    music.play();
+
     use rand::SeedableRng;
     let mut game = Game::new(
         pipe_texture,
@@ -91,6 +114,11 @@ fn main() {
 
             Event::MainEventsCleared => {
                 game.update(1.0/60.0, &input);
+                #[cfg(target_arch = "wasm32")] {
+                    unsafe { // Wasm is single-thread, so this never will be a poblem (hopefully)
+                        &mut *(audio_engine() as *const _ as *mut AudioEngine)
+                    }.update();
+                }
                 input.update();
                 window.request_redraw();
             }
