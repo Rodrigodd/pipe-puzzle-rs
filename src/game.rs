@@ -216,7 +216,7 @@ impl<R: Rng> GameBoard<R> {
         self.lose_anim = 0.0;
         self.again_button.sprite.set_position(-10000000.0, -1000000.0);
         self.level = 0;
-        self.life = 10;
+        self.life = 0;
         self.life_time = 1.0;
         self.life_dirty = true;
         self.score = 0;
@@ -298,20 +298,15 @@ impl<R: Rng> GameBoard<R> {
 
         self.expect_min_click_count = total_diff;
         let area = self.width as u32 * self.height as u32;
-        // 4.39474344992316 + 
-        // 0.335140848886009*col("1") + 
-        // 0.00237509179338798*col("1")*col("1")
         let expect_time =
-            -0.597584184256657 + 
-            0.517966152832989*area as f32 + 
-            0.00076228816742802*area as f32 * area as f32;
+            30.0 + 
+            0.30678867*area as f32 + 
+            0.00119939695*area as f32 * area as f32;
         let expect_click = 
-            4.5791117546534 + 
-            0.652697187590514*area as f32 + 
-            0.00283512681609386*area as f32 * area as f32;
+            30.0 + 
+            0.541692467*area as f32 + 
+            0.0015371886*area as f32 * area as f32;
         self.add_life((expect_time*2.0 + expect_click) as i32);
-        // self.life = (expect_time*2.0 + expect_click) as u32;
-        // self.life_dirty = true;
     }
 
     // preference == 0 mean no preference
@@ -676,7 +671,6 @@ impl<R: Rng> GameBoard<R> {
                     self.reset();
                 }
             }
-
             return;
         }
         
