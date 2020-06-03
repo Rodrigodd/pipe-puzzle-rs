@@ -3,25 +3,18 @@
 <head>
     <title>PIPE PUZZLE</title>
 
-    <script defer="defer" type="module">
+    <script defer type="module">
         import init, { run } from './pkg/pipe_puzzle.js';
-
-        // init().then(() => run());
-        
         init().then(() => {
-            document.onclick = (() => {
-                var executed = false;
-                return () => {
-                    if (!executed) {
-                        executed = true;
-                        run();
-                    }
-                };
-            })();
+            let elem = document.getElementById('loading_div');
+            elem.parentNode.removeChild(elem);
+            run();
         });
     </script>
 </head>
 
-<body oncontextmenu="return false"></body>
+<body oncontextmenu="return false">
+    <div id="loading_div"> Loading... </div>
+</body>
 
 </html>
