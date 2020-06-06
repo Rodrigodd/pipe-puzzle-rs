@@ -61,7 +61,14 @@ impl Pipe {
         Self {
             dir,
             kind,
-            sprite: SpriteInstance::new(x, y, size*1.01, size*1.01, texture, atlas::PIPES[kind as usize]),
+            sprite: SpriteInstance::new(
+                x,
+                y,
+                size * 1.01,
+                size * 1.01,
+                texture,
+                atlas::PIPES[kind as usize],
+            ),
             angle: 0.0,
             previous_angle: 0.0,
             anim_time: 0.000001,
