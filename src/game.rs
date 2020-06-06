@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 use sprite_render::SpriteInstance;
 use audio_engine::{ WavDecoder };
 
@@ -300,19 +302,18 @@ impl<R: Rng> GameBoard<R> {
         let area = self.width as u32 * self.height as u32;
         let expect_time =
             30.0 + 
-            0.30678867*area as f32 + 
-            0.00119939695*area as f32 * area as f32;
+            0.307*area as f32 + 
+            0.00120*area as f32 * area as f32;
         let expect_click = 
             30.0 + 
-            0.541692467*area as f32 + 
-            0.0015371886*area as f32 * area as f32;
+            0.542*area as f32 + 
+            0.00154*area as f32 * area as f32;
         self.add_life((expect_time*2.0 + expect_click) as i32);
     }
 
     // preference == 0 mean no preference
     fn next_region_id(&mut self, preference: u16) -> u16 {
-
-        let ret = if self.region_id_pool.is_empty() {
+        if self.region_id_pool.is_empty() {
             self.number_regions += 1;
             self.number_regions
         } else if preference == 0 {
@@ -329,8 +330,7 @@ impl<R: Rng> GameBoard<R> {
                 }
                 i+=1;
             }
-        };
-        ret
+        }
     }
 
     // If a region is not more valid, it is add back to the pool,
@@ -405,8 +405,8 @@ impl<R: Rng> GameBoard<R> {
 
         let mut to_check: Vec<(usize, u16)> = Vec::with_capacity(5);
 
-        for n in 0..4 {
-            let next = (i + neights[n]) as usize;
+        for n in &neights {
+            let next = (i + n) as usize;
             if (i % self.width as i32 - next as i32 % self.width as i32).abs() <= 1
             && next < self.regions.len() {
                 to_check.push((next, self.regions[next]));
@@ -449,7 +449,7 @@ impl<R: Rng> GameBoard<R> {
         let mut path: Vec<i32> = vec![start as i32];
         grid[start] = 0;
         
-        'path: while path.len() > 0 {
+        'path: while !path.is_empty() {
             let r = rng.gen_range(0, path.len());
             let curr = path[r];
             for i in sample(rng, 4, 4).iter() {
@@ -582,10 +582,8 @@ impl<R: Rng> GameBoard<R> {
                     if (curr_dir & (1<<i) != 0) != (next_dir & (1<<i) != 0) {
                         return false;
                     }
-                } else {
-                    if curr_dir & (1<<i) != 0 { // if curr is connect to nowhere, it is not done
-                        return false;
-                    }
+                } else if curr_dir & (1<<i) != 0 { // if curr is connect to nowhere, it is not done
+                    return false;
                 }
             }
         }
@@ -666,10 +664,8 @@ impl<R: Rng> GameBoard<R> {
             self.again_button.mouse_input(x, y);
             
             self.highlight_sprite.pos[0] = -100.0;
-            if pressed == 1 {
-                if self.again_button.is_over {
-                    self.reset();
-                }
+            if pressed == 1 && self.again_button.is_over {
+                self.reset();
             }
             return;
         }
@@ -705,9 +701,10 @@ impl<R: Rng> GameBoard<R> {
 
     pub fn animate(&mut self, dt: f32) {
         if self.life_dirty {
+            let w = self.life_text.get_width().max(self.score_text.get_width()) + 0.03;
             self.life_number = utils::number_to_sprites(
                 self.life,
-                self.life_text.pos[0] + self.life_text.get_width() / 2.0,
+                self.life_text.pos[0] - self.life_text.get_width() / 2.0 + w,
                 self.life_text.pos[1],
                 self.life_text.get_height(),
                 [255, 0, 0, 255],
@@ -717,9 +714,10 @@ impl<R: Rng> GameBoard<R> {
         }
 
         if self.score_dirty {
+            let w = self.life_text.get_width().max(self.score_text.get_width()) + 0.03;
             self.score_number = utils::number_to_sprites(
                 self.score,
-                self.score_text.pos[0] + self.score_text.get_width() / 2.0,
+                self.score_text.pos[0] - self.score_text.get_width() / 2.0 + w,
                 self.score_text.pos[1],
                 self.score_text.get_height(),
                 [255, 0, 0, 255],
@@ -774,7 +772,7 @@ impl<R: Rng> GameBoard<R> {
                 let t = self.lose_anim - 1.0;
                 let d = t*t/(t + 0.5);
                 if self.score_text.get_x() > 1.0 {
-                    self.score_text.set_position(1.5 + d, -0.5);
+                    self.score_text.set_position(1.13 + self.life_text.get_width() / 2.0 + d, -0.5);
                 } else {
                     self.score_text.set_position(0.0, -1.3 - d);
                 }
@@ -784,8 +782,8 @@ impl<R: Rng> GameBoard<R> {
 
     pub fn resize(&mut self, width: f32, height: f32) {
         if width > height {
-            self.life_text.set_position(1.5, -0.9);
-            self.score_text.set_position(1.5, -0.5);
+            self.life_text.set_position(1.13 + self.life_text.get_width() / 2.0, -0.3);
+            self.score_text.set_position(1.13 + self.score_text.get_width() / 2.0, -0.0);
         } else {
             self.life_text.set_position(-0.9, -1.3);
             self.score_text.set_position(0.0, -1.3);
@@ -906,10 +904,8 @@ impl<R: Rng> Game<R> {
             self.back_button.mouse_input(input.mouse_x, input.mouse_y);
             self.back_button.update(dt);
 
-            if input.mouse_left_state == 3 {
-                if self.back_button.is_over { 
-                    self.in_menu = true;
-                }
+            if input.mouse_left_state == 3 && self.back_button.is_over { 
+                self.in_menu = true;
             }
 
             self.board.mouse_input(input.mouse_x, input.mouse_y, if input.mouse_left_state == 3 {
@@ -924,8 +920,20 @@ impl<R: Rng> Game<R> {
 
     pub fn resize(&mut self, width: f32, height: f32) {
         self.board.resize(width, height);
-        if width > height {
-            self.back_button.sprite.set_position(-1.5, -0.9);
+        let prop = width as f32 / height as f32;
+        if prop > 1.0 {
+            let x;
+            if prop  > 1280.0/720.0 {
+                x = - 1.1 - (1280.0/720.0 - 1.0) * 1.1 / 2.0;
+            } else if prop > 1280.0/720.0/2.0 + 0.65 {
+                let l = - width + 1.1*1280.0/720.0;
+                x = (l - 1.1)/2.0;
+            } else if prop > 1280.0/720.0/2.0 + 0.5 {
+                x = 1.1*1280.0/720.0 - 0.2;
+            }else {
+                x = width - 1.1 - 0.2;
+            }
+            self.back_button.sprite.set_position(x, -0.9);
         } else {
             self.back_button.sprite.set_position(-0.9, -1.6);
         }
@@ -935,7 +943,7 @@ impl<R: Rng> Game<R> {
         if self.in_menu {
             vec![self.background_painel.clone(), self.start_button.sprite.clone(), self.close_button.sprite.clone()]
         } else {
-            let mut vec = vec![self.background_painel.clone(), self.back_button.sprite.clone()];
+            let mut vec = vec![self.back_button.sprite.clone(), self.background_painel.clone()];
             vec.append(&mut self.board.get_sprites());
             vec
         }

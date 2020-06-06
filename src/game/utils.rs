@@ -7,7 +7,7 @@ pub fn number_to_sprites(number: u32, x: f32, y: f32, scale: f32, color: [u8; 4]
     let mut pos = scale/2.0;
     for c in string.chars() {
         let mut sprite = SpriteInstance::new(x+pos, y, scale, scale, texture, NUMBERS[c as usize - '0' as usize]);
-        sprite.set_color(color.clone());
+        sprite.set_color(color);
         sprites.push(sprite);
         pos += scale*0.8;
     }

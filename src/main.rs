@@ -1,14 +1,16 @@
 use std::io::Cursor;
 
-use sprite_render::{ default_render, Camera };
+use sprite_render::{ default_render, Camera, SpriteRender };
 use audio_engine::{ AudioEngine, OggDecoder };
 
 use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
-    event::{ Event, WindowEvent, KeyboardInput, ElementState, MouseButton  },
-    dpi::{ LogicalSize, PhysicalPosition }
+    event::{ Event, WindowEvent, ElementState, MouseButton  },
+    dpi::{ LogicalSize, PhysicalSize, PhysicalPosition }
 };
+
+use rand::Rng;
 
 mod time;
 use time::Instant;
@@ -28,12 +30,37 @@ fn audio_engine() -> &'static AudioEngine {
     }
 }
 
+fn resize<R: SpriteRender + ?Sized, T: Rng>(size: PhysicalSize<u32>,render: &mut R, camera: &mut Camera, game: &mut Game<T>) {
+    render.resize(size.width, size.height);
+    camera.resize(size);
+    let prop = size.width as f32 / size.height as f32;
+    if prop > 1.0 { // landscape
+        if prop  > 1280.0/720.0 {
+            camera.set_position(0.0, 0.0);
+        } else if prop > 1280.0/720.0/2.0 + 0.5 {
+            camera.set_position(- camera.width() as f32 / 2.0 + 1.1*1280.0/720.0, 0.0);
+        } else {
+            camera.set_position(camera.width() as f32 / 2.0 - 1.1, 0.0);
+        }
+    } else { // portrait
+        if prop < 720.0/1280.0 {
+            camera.set_position(0.0, 0.0);
+        } else if prop < 1.0/(1280.0/720.0/2.0 + 0.5) {
+            camera.set_position(0.0, camera.height() as f32 / 2.0 - 1.1*1280.0/720.0);
+        } else {
+            camera.set_position(0.0, - camera.height() as f32 / 2.0 + 1.1);
+        }
+    }
+    game.resize(camera.width(), camera.height());
+    game.update(0.0, &game::Input::default());
+}
+
 
 fn main() {
     let events_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("Hello world!")
-        .with_inner_size(LogicalSize::new(1280.0*0.8, 720.0*0.8));
+        .with_inner_size(LogicalSize::new(768.0, 553.0));
     
     // create the SpriteRender
     let (window, mut render) = default_render(wb, &events_loop, true);
@@ -70,6 +97,7 @@ fn main() {
 
     let mut input = game::Input::default();
     
+    resize(window.inner_size(), render.as_mut(), &mut camera, &mut game);
     events_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Poll;
         match event {
@@ -89,13 +117,6 @@ fn main() {
                             };
                         }
                     },
-                    WindowEvent::KeyboardInput { input: KeyboardInput {
-                        virtual_keycode: Some(key),
-                        state: ElementState::Pressed,
-                        ..
-                    }, ..} => match key {
-                        _ => ()
-                    }
                     WindowEvent::CursorMoved { position, .. } => {
                         cursor = position;
                         let (x,y) = camera.position_to_word_space(cursor.x as f32, cursor.y as f32);
@@ -103,10 +124,7 @@ fn main() {
                         input.mouse_y = y;
                     }
                     WindowEvent::Resized(size) => {
-                        render.resize(size.width, size.height);
-                        camera.resize(size);
-                        game.resize(size.width as f32, size.height as f32);
-                        // game.update(0.0, &game::Input::default());
+                        resize(size, render.as_mut(), &mut camera, &mut game);
                     }
                     _ => (),
                 }
