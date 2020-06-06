@@ -27,7 +27,7 @@ sprite-render = { version = "0.1", path = "../sprite-render-rs" }
 audio-engine = { version = "0.1", path = "../audio-engine"}
 winit = "0.22"
 rand = { version = "0.7", features = ["small_rng"] }
-image = "0.23"
+image = { version = "0.23", default-features = false, features = ["png"] }
 ezing = "0.2.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -38,4 +38,16 @@ wasm-timer = "0.2"
 [build-dependencies]
 
 rect_packer = "0.2"
-image = "0.23"
+image = { version = "0.23", default-features = false, features = ["png"] }
+
+
+## set opt-level of the below crates to faster png file loading in debug build
+
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.adler32]
+opt-level = 3
+[profile.dev.package.inflate]
+opt-level = 3

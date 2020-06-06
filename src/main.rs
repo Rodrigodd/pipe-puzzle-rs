@@ -60,18 +60,19 @@ fn main() {
     let events_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("Hello world!")
-        .with_inner_size(LogicalSize::new(768.0, 553.0));
+        .with_inner_size(LogicalSize::new(768.0, 553.0))
+        .with_visible(false);
     
     // create the SpriteRender
     let (window, mut render) = default_render(wb, &events_loop, true);
     let pipe_texture = {
+        let now = Instant::now();
         let image = image::load_from_memory(
             include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png"))
         ).unwrap().to_rgba();
-
         render.load_texture(image.width(), image.height(), image.into_raw().as_slice(), true)
     };
-
+    
     let mut music = audio_engine().new_sound(
             OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..]))
         ).unwrap();
@@ -96,7 +97,7 @@ fn main() {
     let mut cursor = PhysicalPosition::new(0.0, 0.0);
 
     let mut input = game::Input::default();
-    
+    window.set_visible(true);
     resize(window.inner_size(), render.as_mut(), &mut camera, &mut game);
     events_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Poll;
