@@ -152,7 +152,7 @@ fn main() {
                     );
                 }
                 render.render()
-                    .clear_screen(&[0.0f32, 0.3, 0.0, 1.0])
+                    .clear_screen(&[0.0f32, 0.25, 0.0, 1.0])
                     .draw_sprites(&mut camera, &game.get_sprites())
                     .finish();
             }

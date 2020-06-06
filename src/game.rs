@@ -1,13 +1,13 @@
 #![allow(clippy::needless_range_loop)]
 
+use audio_engine::WavDecoder;
 use sprite_render::SpriteInstance;
-use audio_engine::{ WavDecoder };
 
-use rand::Rng;
 use rand::seq::index::sample;
+use rand::Rng;
 
-use std::f32::consts::PI;
 use std::collections::HashMap;
+use std::f32::consts::PI;
 use std::io::Cursor;
 
 use crate::time::Instant;
@@ -16,14 +16,22 @@ mod utils;
 
 use ezing::*;
 fn lerp(t: f32, a: f32, b: f32) -> f32 {
-    a + (b-a)*t
+    a + (b - a) * t
 }
 
 const COLORS: &[[u8; 4]] = &[
-    [0xff, 0x00, 0x00, 0xff], [0x00, 0xff, 0x00, 0xff], [0x00, 0x00, 0xff, 0xff], // red, green, ~blue
-    [0xff, 0xff, 0x00, 0xff], [0xff, 0x00, 0xff, 0xff], [0x00, 0xff, 0xff, 0xff], // yellow, purple, cyan
-    [0xff, 0x7f, 0x00, 0xff], [0xff, 0xff, 0xff, 0xff], [0xb2, 0xb2, 0xb2, 0xff], // orange, white, gray
-    [0x99, 0x16, 0x00, 0xff], [0xb2, 0xb2, 0x00, 0xff], [0x48, 0x48, 0x48, 0xff], // brown, dark_yellow, black
+    [0xff, 0x00, 0x00, 0xff],
+    [0x00, 0xff, 0x00, 0xff],
+    [0x00, 0x00, 0xff, 0xff], // red, green, ~blue
+    [0xff, 0xff, 0x00, 0xff],
+    [0xff, 0x00, 0xff, 0xff],
+    [0x00, 0xff, 0xff, 0xff], // yellow, purple, cyan
+    [0xff, 0x7f, 0x00, 0xff],
+    [0xff, 0xff, 0xff, 0xff],
+    [0xb2, 0xb2, 0xb2, 0xff], // orange, white, gray
+    [0x99, 0x16, 0x00, 0xff],
+    [0xb2, 0xb2, 0x00, 0xff],
+    [0x48, 0x48, 0x48, 0xff], // brown, dark_yellow, black
 ];
 
 mod atlas {
@@ -53,7 +61,7 @@ impl Pipe {
         Self {
             dir,
             kind,
-            sprite: SpriteInstance::new(x, y, size, size, texture, atlas::PIPES[kind as usize]),
+            sprite: SpriteInstance::new(x, y, size*1.01, size*1.01, texture, atlas::PIPES[kind as usize]),
             angle: 0.0,
             previous_angle: 0.0,
             anim_time: 0.000001,
@@ -65,19 +73,32 @@ impl Pipe {
 
     fn animate(&mut self, dt: f32) {
         if self.anim_time != 0.0 {
-            self.anim_time = (self.anim_time - dt*0.7).max(0.0);
-            let d = ((self.dir as f32 * PI/2.0) - self.previous_angle + PI).rem_euclid(2.0*PI) - PI;
+            self.anim_time = (self.anim_time - dt * 0.7).max(0.0);
+            let d =
+                ((self.dir as f32 * PI / 2.0) - self.previous_angle + PI).rem_euclid(2.0 * PI) - PI;
             let t = elastic_out(1.0 - self.anim_time);
             self.angle = self.previous_angle + lerp(t, 0.0, d);
             self.sprite.set_angle(self.angle);
         }
         if self.color_time != 0.0 {
-            self.color_time = (self.color_time - dt*3.0).max(0.0);
+            self.color_time = (self.color_time - dt * 3.0).max(0.0);
             let t = 1.0 - self.color_time;
             let color = [
-                lerp(t, self.previous_color[0] as f32, COLORS[self.target_color as usize % COLORS.len()][0] as f32) as u8,
-                lerp(t, self.previous_color[1] as f32, COLORS[self.target_color as usize % COLORS.len()][1] as f32) as u8,
-                lerp(t, self.previous_color[2] as f32, COLORS[self.target_color as usize % COLORS.len()][2] as f32) as u8,
+                lerp(
+                    t,
+                    self.previous_color[0] as f32,
+                    COLORS[self.target_color as usize % COLORS.len()][0] as f32,
+                ) as u8,
+                lerp(
+                    t,
+                    self.previous_color[1] as f32,
+                    COLORS[self.target_color as usize % COLORS.len()][1] as f32,
+                ) as u8,
+                lerp(
+                    t,
+                    self.previous_color[2] as f32,
+                    COLORS[self.target_color as usize % COLORS.len()][2] as f32,
+                ) as u8,
                 255,
             ];
             self.sprite.set_color(color);
@@ -88,13 +109,14 @@ impl Pipe {
     /// When right is true it is a right mouse button click, otherwise is left.
     fn click(&mut self, right: bool) {
         if right {
-            self.dir = (self.dir + 1)%4;
+            self.dir = (self.dir + 1) % 4;
         } else {
-            self.dir = (self.dir + 4 - 1)%4;
+            self.dir = (self.dir + 4 - 1) % 4;
         }
-        crate::audio_engine().new_sound(
-            WavDecoder::new(Cursor::new(sounds::CLICK))
-        ).unwrap().play();
+        crate::audio_engine()
+            .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
+            .unwrap()
+            .play();
         self.anim_time = 1.0;
         self.previous_angle = self.angle;
     }
@@ -166,10 +188,10 @@ struct GameBoard<R: Rng> {
 }
 impl<R: Rng> GameBoard<R> {
     pub fn new(texture: u32, rng: R) -> Self {
-        
-        let mut highlight_sprite = SpriteInstance::new(-100.0, 0.0, 1.0, 1.0, texture, atlas::BLANCK);
+        let mut highlight_sprite =
+            SpriteInstance::new(-100.0, 0.0, 1.0, 1.0, texture, atlas::BLANCK);
         highlight_sprite.set_color([255, 255, 255, 64]);
-        
+
         let mut this = Self {
             width: 0,
             height: 0,
@@ -185,7 +207,7 @@ impl<R: Rng> GameBoard<R> {
             again_button: Button::new(
                 SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::PLAY_AGAIN)
                     .with_color([255, 255, 0, 255]),
-                [-0.30, 0.30, -0.06, 0.06]
+                [-0.30, 0.30, -0.06, 0.06],
             ),
             texture,
             level: 0,
@@ -193,13 +215,13 @@ impl<R: Rng> GameBoard<R> {
             life_time: 1.0,
             life_dirty: true,
             life_text: SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::TIME)
-                .with_color([0, 255, 0, 255]),
+                .with_color([0, 240, 0, 255]),
             life_number: Vec::new(),
             score: 0,
             level_score: 0,
             score_dirty: true,
             score_text: SpriteInstance::new_height_prop(1.2, -0.9, 0.1, texture, atlas::SCORE)
-                .with_color([0, 255, 0, 255]),
+                .with_color([0, 240, 0, 255]),
             score_number: Vec::new(),
             click_count: 0,
             expect_min_click_count: 0,
@@ -211,12 +233,12 @@ impl<R: Rng> GameBoard<R> {
         this
     }
 
-    
-
     pub fn reset(&mut self) {
         self.win_anim = 0.0;
         self.lose_anim = 0.0;
-        self.again_button.sprite.set_position(-10000000.0, -1000000.0);
+        self.again_button
+            .sprite
+            .set_position(-10000000.0, -1000000.0);
         self.level = 0;
         self.life = 0;
         self.life_time = 1.0;
@@ -233,7 +255,7 @@ impl<R: Rng> GameBoard<R> {
         }
 
         self.new_level(4, 4);
-    } 
+    }
 
     fn new_level(&mut self, width: u8, height: u8) {
         self.width = width;
@@ -246,7 +268,7 @@ impl<R: Rng> GameBoard<R> {
         let maze = Self::gen_maze(width, height, &mut self.rng);
         let mut i = 0usize;
         let size = 2.0 / self.height as f32;
-        self.highlight_sprite.set_size(size*0.9, size*0.9);
+        self.highlight_sprite.set_size(size * 0.9, size * 0.9);
 
         self.level_start = Instant::now();
         self.click_count = 0;
@@ -255,7 +277,7 @@ impl<R: Rng> GameBoard<R> {
         self.level_score = 0;
 
         let mut total_diff = 0u32;
-        
+
         for y in 0..height {
             for x in 0..width {
                 let (kind, dir) = match maze[i] {
@@ -263,7 +285,7 @@ impl<R: Rng> GameBoard<R> {
                     0b0010 => (0, 1),
                     0b0100 => (0, 2),
                     0b1000 => (0, 3),
-    
+
                     0b0011 => (1, 0),
                     0b0110 => (1, 1),
                     0b1100 => (1, 2),
@@ -271,44 +293,37 @@ impl<R: Rng> GameBoard<R> {
 
                     0b0101 => (2, 0),
                     0b1010 => (2, 1),
-    
+
                     0b1110 => (3, 0),
                     0b1101 => (3, 1),
                     0b1011 => (3, 2),
                     0b0111 => (3, 3),
-    
+
                     0b1111 => (4, 0),
                     _ => (5, 0),
-    
                 };
 
                 let diff = self.rng.gen_range(0, 4);
-                total_diff += if diff <= 2 { diff } else { 4 - diff};
-                
+                total_diff += if diff <= 2 { diff } else { 4 - diff };
+
                 self.pipes.push(Pipe::new(
-                    (x as f32 - width as f32 / 2.0) * size + size/2.0,
-                    (y as f32 - height as f32 / 2.0) * size + size/2.0,
+                    (x as f32 - width as f32 / 2.0) * size + size / 2.0,
+                    (y as f32 - height as f32 / 2.0) * size + size / 2.0,
                     size,
-                    self.texture, 
+                    self.texture,
                     kind,
-                    (dir + diff as u8) % 4
+                    (dir + diff as u8) % 4,
                 ));
-                i+=1;
+                i += 1;
             }
         }
         self.trace_regions();
 
         self.expect_min_click_count = total_diff;
         let area = self.width as u32 * self.height as u32;
-        let expect_time =
-            30.0 + 
-            0.307*area as f32 + 
-            0.00120*area as f32 * area as f32;
-        let expect_click = 
-            30.0 + 
-            0.542*area as f32 + 
-            0.00154*area as f32 * area as f32;
-        self.add_life((expect_time*2.0 + expect_click) as i32);
+        let expect_time = 30.0 + 0.307 * area as f32 + 0.00120 * area as f32 * area as f32;
+        let expect_click = 30.0 + 0.542 * area as f32 + 0.00154 * area as f32 * area as f32;
+        self.add_life((expect_time * 2.0 + expect_click) as i32);
     }
 
     // preference == 0 mean no preference
@@ -328,7 +343,7 @@ impl<R: Rng> GameBoard<R> {
                     self.region_id_pool.swap_remove(i);
                     break preference;
                 }
-                i+=1;
+                i += 1;
             }
         }
     }
@@ -358,13 +373,16 @@ impl<R: Rng> GameBoard<R> {
                 3 => 0b11101110,
                 4 => 0b11111111,
                 _ => 0,
-            }.rotate_left(self.pipes[curr as usize].dir as u32);
+            }
+            .rotate_left(self.pipes[curr as usize].dir as u32);
 
             for i in 0..4 {
                 let next = (curr + neights[i]) as usize;
                 if (curr % self.width as i32 - next as i32 % self.width as i32).abs() <= 1
-                && next < self.regions.len()
-                && !visited[next] {      // if it is inexpored
+                    && next < self.regions.len()
+                    && !visited[next]
+                {
+                    // if it is inexpored
                     let next_dir = match self.pipes[next as usize].kind {
                         0 => 0b00010001u8,
                         1 => 0b00110011,
@@ -372,8 +390,9 @@ impl<R: Rng> GameBoard<R> {
                         3 => 0b11101110,
                         4 => 0b11111111,
                         _ => 0,
-                    }.rotate_left(self.pipes[next as usize].dir as u32 + 2);
-                    if curr_dir & (1<<i) & next_dir != 0 {
+                    }
+                    .rotate_left(self.pipes[next as usize].dir as u32 + 2);
+                    if curr_dir & (1 << i) & next_dir != 0 {
                         explore.push(next as i32);
                         self.regions[next] = region;
                         visited[next] = true;
@@ -385,12 +404,11 @@ impl<R: Rng> GameBoard<R> {
         }
 
         self.region_size.insert(region, count);
-
     }
 
     fn trace_regions(&mut self) {
         self.regions = vec![0u16; self.width as usize * self.height as usize];
-        
+
         let mut region;
         for i in 0..(self.width as usize * self.height as usize) {
             if self.regions[i] == 0 {
@@ -408,15 +426,14 @@ impl<R: Rng> GameBoard<R> {
         for n in &neights {
             let next = (i + n) as usize;
             if (i % self.width as i32 - next as i32 % self.width as i32).abs() <= 1
-            && next < self.regions.len() {
+                && next < self.regions.len()
+            {
                 to_check.push((next, self.regions[next]));
                 self.regions[next] = 0;
             }
         }
-        
-        to_check.sort_by_key(|(_, x)| {
-            u16::max_value() - self.region_size.get(x).unwrap()
-        });
+
+        to_check.sort_by_key(|(_, x)| u16::max_value() - self.region_size.get(x).unwrap());
 
         to_check.push((i as usize, self.regions[i as usize]));
         self.regions[i as usize] = 0;
@@ -448,18 +465,20 @@ impl<R: Rng> GameBoard<R> {
         let start = rng.gen_range(0, grid.len());
         let mut path: Vec<i32> = vec![start as i32];
         grid[start] = 0;
-        
+
         'path: while !path.is_empty() {
             let r = rng.gen_range(0, path.len());
             let curr = path[r];
             for i in sample(rng, 4, 4).iter() {
                 let next = (curr + neights[i]) as usize;
                 if (curr % width as i32 - next as i32 % width as i32).abs() <= 1
-                && next < grid.len()
-                && grid[next] == 0 {      // if it is inexpored
-                    grid[curr as usize] |= 1 << i;  // set dir bitmask
-                    grid[next] |= 1 << ((i+2)%4); // set dir bitmask
-                    path.push(next as i32);         // add to the backtrack path
+                    && next < grid.len()
+                    && grid[next] == 0
+                {
+                    // if it is inexpored
+                    grid[curr as usize] |= 1 << i; // set dir bitmask
+                    grid[next] |= 1 << ((i + 2) % 4); // set dir bitmask
+                    path.push(next as i32); // add to the backtrack path
                     continue 'path;
                 }
             }
@@ -472,10 +491,11 @@ impl<R: Rng> GameBoard<R> {
                 for i in sample(rng, 4, 4).iter() {
                     let next = (curr + neights[i]) as usize;
                     if (curr % width as i32 - next as i32 % width as i32).abs() <= 1
-                    && next < grid.len()
-                    && grid[next] & (1 << ((i+2)%4)) == 0 {
-                        grid[curr as usize] |= 1 << i;  // set dir bitmask
-                        grid[next] |= 1 << ((i+2)%4); // set dir bitmask
+                        && next < grid.len()
+                        && grid[next] & (1 << ((i + 2) % 4)) == 0
+                    {
+                        grid[curr as usize] |= 1 << i; // set dir bitmask
+                        grid[next] |= 1 << ((i + 2) % 4); // set dir bitmask
                         break;
                     }
                 }
@@ -504,11 +524,10 @@ impl<R: Rng> GameBoard<R> {
                 0b0111 => print!("╦"),
 
                 0b1111 => print!("╬"),
-                _ => print!(" ")
-
+                _ => print!(" "),
             };
-            i+=1;
-            if i%width as usize == 0 {
+            i += 1;
+            if i % width as usize == 0 {
                 println!();
             }
         }
@@ -532,9 +551,11 @@ impl<R: Rng> GameBoard<R> {
                 3 => 0b11101110,
                 4 => 0b11111111,
                 _ => 0,
-            }.rotate_left(self.pipes[curr as usize].dir as u32);
+            }
+            .rotate_left(self.pipes[curr as usize].dir as u32);
 
-            if curr_dir & (1<<3) != 0 { // if curr is connect to nowhere, it is not done
+            if curr_dir & (1 << 3) != 0 {
+                // if curr is connect to nowhere, it is not done
                 return false;
             }
         }
@@ -548,9 +569,11 @@ impl<R: Rng> GameBoard<R> {
                 3 => 0b11101110,
                 4 => 0b11111111,
                 _ => 0,
-            }.rotate_left(self.pipes[curr as usize].dir as u32);
+            }
+            .rotate_left(self.pipes[curr as usize].dir as u32);
 
-            if curr_dir & (1<<2) != 0 { // if curr is connect to nowhere, it is not done
+            if curr_dir & (1 << 2) != 0 {
+                // if curr is connect to nowhere, it is not done
                 return false;
             }
         }
@@ -563,12 +586,14 @@ impl<R: Rng> GameBoard<R> {
                 3 => 0b11101110,
                 4 => 0b11111111,
                 _ => 0,
-            }.rotate_left(self.pipes[curr as usize].dir as u32);
+            }
+            .rotate_left(self.pipes[curr as usize].dir as u32);
 
             for i in 0..2 {
                 let next = (curr + neights[i]) as usize;
                 if (curr % self.width as i32 - next as i32 % self.width as i32).abs() <= 1
-                && next < self.regions.len() {
+                    && next < self.regions.len()
+                {
                     let next_dir = match self.pipes[next as usize].kind {
                         0 => 0b00010001u8,
                         1 => 0b00110011,
@@ -576,13 +601,15 @@ impl<R: Rng> GameBoard<R> {
                         3 => 0b11101110,
                         4 => 0b11111111,
                         _ => 0,
-                    }.rotate_left(self.pipes[next as usize].dir as u32 + 2);
+                    }
+                    .rotate_left(self.pipes[next as usize].dir as u32 + 2);
 
                     // If curr and next have a unparied connection, it is not done
-                    if (curr_dir & (1<<i) != 0) != (next_dir & (1<<i) != 0) {
+                    if (curr_dir & (1 << i) != 0) != (next_dir & (1 << i) != 0) {
                         return false;
                     }
-                } else if curr_dir & (1<<i) != 0 { // if curr is connect to nowhere, it is not done
+                } else if curr_dir & (1 << i) != 0 {
+                    // if curr is connect to nowhere, it is not done
                     return false;
                 }
             }
@@ -594,9 +621,8 @@ impl<R: Rng> GameBoard<R> {
     fn count_connections(&self) -> u32 {
         let neights: [i32; 2] = [1, self.width as i32];
         let mut count = 0;
-        
-        for curr in 0..(self.width as i32 * (self.height as i32)) {
 
+        for curr in 0..(self.width as i32 * (self.height as i32)) {
             let curr_dir = match self.pipes[curr as usize].kind {
                 0 => 0b00010001u8,
                 1 => 0b00110011,
@@ -604,12 +630,14 @@ impl<R: Rng> GameBoard<R> {
                 3 => 0b11101110,
                 4 => 0b11111111,
                 _ => 0,
-            }.rotate_left(self.pipes[curr as usize].dir as u32);
+            }
+            .rotate_left(self.pipes[curr as usize].dir as u32);
 
             for i in 0..2 {
                 let next = (curr + neights[i]) as usize;
                 if (curr % self.width as i32 - next as i32 % self.width as i32).abs() <= 1
-                && next < self.regions.len() {
+                    && next < self.regions.len()
+                {
                     let next_dir = match self.pipes[next as usize].kind {
                         0 => 0b00010001u8,
                         1 => 0b00110011,
@@ -617,10 +645,11 @@ impl<R: Rng> GameBoard<R> {
                         3 => 0b11101110,
                         4 => 0b11111111,
                         _ => 0,
-                    }.rotate_left(self.pipes[next as usize].dir as u32 + 2);
+                    }
+                    .rotate_left(self.pipes[next as usize].dir as u32 + 2);
 
                     // If curr and next have a paried connection, count it
-                    if (curr_dir & (1<<i) != 0) && (next_dir & (1<<i) != 0) {
+                    if (curr_dir & (1 << i) != 0) && (next_dir & (1 << i) != 0) {
                         count += 1;
                     }
                 }
@@ -640,6 +669,8 @@ impl<R: Rng> GameBoard<R> {
     fn trigger_lose(&mut self) {
         self.lose_anim = 1.0;
         self.win_sprite.set_uv_rect(atlas::YOU_LOSE);
+        self.win_sprite
+            .set_size(atlas::YOU_LOSE[2] / atlas::YOU_LOSE[3], 1.0);
         self.win_sprite.set_color([255, 0, 0, 255]);
         self.win_sprite.set_angle(0.0);
     }
@@ -647,10 +678,13 @@ impl<R: Rng> GameBoard<R> {
     fn trigger_win(&mut self) {
         self.win_anim = 1.0;
         self.win_sprite.set_uv_rect(atlas::YOU_WIN);
+        self.win_sprite
+            .set_size(atlas::YOU_WIN[2] / atlas::YOU_WIN[3], 1.0);
         self.win_sprite.set_color([255, 255, 255, 255]);
-        crate::audio_engine().new_sound(
-            WavDecoder::new(Cursor::new(sounds::WHOOSH))
-        ).unwrap().play();
+        crate::audio_engine()
+            .new_sound(WavDecoder::new(Cursor::new(sounds::WHOOSH)))
+            .unwrap()
+            .play();
     }
 
     /// Receive the in world space coordinate of the mouse position.
@@ -662,24 +696,25 @@ impl<R: Rng> GameBoard<R> {
         }
         if self.lose_anim > 0.0 {
             self.again_button.mouse_input(x, y);
-            
+
             self.highlight_sprite.pos[0] = -100.0;
             if pressed == 1 && self.again_button.is_over {
                 self.reset();
             }
             return;
         }
-        
-        let x = ((x + self.width as f32 / self.height as f32)/2.0 * self.height as f32).floor() as i32;
+
+        let x = ((x + self.width as f32 / self.height as f32) / 2.0 * self.height as f32).floor()
+            as i32;
         let y = ((y + 1.0) / 2.0 * self.height as f32).floor() as i32;
         if x >= 0 && x < self.width as i32 && y >= 0 && y < self.height as i32 {
             if pressed == 0 {
                 self.highlight_sprite.pos = [
                     2.0 * (x as f32 + 0.5) / self.width as f32 - 1.0,
-                    2.0 * (y as f32 + 0.5) / self.height as f32 - 1.0
+                    2.0 * (y as f32 + 0.5) / self.height as f32 - 1.0,
                 ];
             } else {
-                let i = y*self.width as i32 + x;
+                let i = y * self.width as i32 + x;
                 self.click_count += 1;
                 self.pipes[i as usize].click(pressed != 1);
                 self.update_regions(i);
@@ -709,7 +744,7 @@ impl<R: Rng> GameBoard<R> {
                 self.life_text.get_height(),
                 [255, 0, 0, 255],
                 false,
-                self.texture
+                self.texture,
             );
         }
 
@@ -722,7 +757,7 @@ impl<R: Rng> GameBoard<R> {
                 self.score_text.get_height(),
                 [255, 0, 0, 255],
                 false,
-                self.texture
+                self.texture,
             );
         }
 
@@ -736,43 +771,55 @@ impl<R: Rng> GameBoard<R> {
                 self.life_time += 0.5;
             }
         } else if self.win_anim > 0.0 {
-            self.win_anim = (self.win_anim - dt*0.5).max(0.0);
+            self.win_anim = (self.win_anim - dt * 0.5).max(0.0);
 
-            let x = ((self.win_anim-0.5)*PI).tan()*0.5;
-            let angle = lerp(x, 0.0, PI/4.0);
+            let x = ((self.win_anim - 0.5) * PI).tan() * 0.5;
+            let angle = lerp(x, 0.0, PI / 4.0);
 
             self.win_sprite.set_angle(angle);
             self.win_sprite.set_position(x, 0.0);
 
             if self.win_anim == 0.0 {
-                #[cfg(not(target_arch = "wasm32"))]{
+                #[cfg(not(target_arch = "wasm32"))]
+                {
                     use std::io::Write;
                     let mut file = std::fs::OpenOptions::new()
                         .write(true)
                         .append(true)
                         .create(true)
-                        .open("log.txt").unwrap();
-                    writeln!(file, "{},{},{},{},{}", self.width, self.height, self.expect_min_click_count, self.click_count, self.level_start.elapsed().as_secs_f32()).unwrap();
+                        .open("log.txt")
+                        .unwrap();
+                    writeln!(
+                        file,
+                        "{},{},{},{},{}",
+                        self.width,
+                        self.height,
+                        self.expect_min_click_count,
+                        self.click_count,
+                        self.level_start.elapsed().as_secs_f32()
+                    )
+                    .unwrap();
                 }
-                self.new_level(self.width + 1, self.height  + 1);
+                self.new_level(self.width + 1, self.height + 1);
             }
         } else if self.lose_anim > 0.0 {
             self.again_button.update(dt);
-            self.lose_anim = (self.lose_anim - dt*0.5).max(f32::MIN_POSITIVE);
+            self.lose_anim = (self.lose_anim - dt * 0.5).max(f32::MIN_POSITIVE);
 
-            let y = -0.2*(self.lose_anim*self.lose_anim)/(self.lose_anim-1.0);
-            self.win_sprite.set_position(0.0, -y-0.4);
+            let y = -0.2 * (self.lose_anim * self.lose_anim) / (self.lose_anim - 1.0);
+            self.win_sprite.set_position(0.0, -y - 0.4);
 
             if self.lose_anim < 0.5 {
-                let t = self.lose_anim*2.0;
-                let y = -0.4*(t*t*4.0)/(t-1.0);
+                let t = self.lose_anim * 2.0;
+                let y = -0.4 * (t * t * 4.0) / (t - 1.0);
                 self.score_text.set_position(0.0, y + 0.5);
-                self.again_button.sprite.set_position(0.0, y*3.0 + 0.7);
+                self.again_button.sprite.set_position(0.0, y * 3.0 + 0.7);
             } else {
                 let t = self.lose_anim - 1.0;
-                let d = t*t/(t + 0.5);
+                let d = t * t / (t + 0.5);
                 if self.score_text.get_x() > 1.0 {
-                    self.score_text.set_position(1.13 + self.life_text.get_width() / 2.0 + d, -0.5);
+                    self.score_text
+                        .set_position(1.13 + self.life_text.get_width() / 2.0 + d, -0.5);
                 } else {
                     self.score_text.set_position(0.0, -1.3 - d);
                 }
@@ -782,8 +829,10 @@ impl<R: Rng> GameBoard<R> {
 
     pub fn resize(&mut self, width: f32, height: f32) {
         if width > height {
-            self.life_text.set_position(1.13 + self.life_text.get_width() / 2.0, -0.3);
-            self.score_text.set_position(1.13 + self.score_text.get_width() / 2.0, -0.0);
+            self.life_text
+                .set_position(1.13 + self.life_text.get_width() / 2.0, -0.3);
+            self.score_text
+                .set_position(1.13 + self.score_text.get_width() / 2.0, -0.0);
         } else {
             self.life_text.set_position(-0.9, -1.3);
             self.score_text.set_position(0.0, -1.3);
@@ -791,7 +840,7 @@ impl<R: Rng> GameBoard<R> {
     }
 
     pub fn get_sprites(&self) -> Vec<SpriteInstance> {
-        let mut sprites= Vec::with_capacity(self.pipes.len() + self.life_number.len() + 3);
+        let mut sprites = Vec::with_capacity(self.pipes.len() + self.life_number.len() + 3);
         sprites.push(self.highlight_sprite.clone());
         for pipe in self.pipes.iter() {
             sprites.push(pipe.sprite.clone());
@@ -821,7 +870,6 @@ struct Button {
     is_over: bool,
 }
 impl Button {
-
     fn new(sprite: SpriteInstance, bounds: [f32; 4]) -> Self {
         Self {
             height: sprite.get_height(),
@@ -833,21 +881,21 @@ impl Button {
     }
 
     fn mouse_input(&mut self, x: f32, y: f32) {
-        let left   = self.sprite.get_x() + self.bounds[0];
-        let rigth  = self.sprite.get_x() + self.bounds[1];
-        let top    = self.sprite.get_y() + self.bounds[2];
+        let left = self.sprite.get_x() + self.bounds[0];
+        let rigth = self.sprite.get_x() + self.bounds[1];
+        let top = self.sprite.get_y() + self.bounds[2];
         let bottom = self.sprite.get_y() + self.bounds[3];
 
         self.is_over = x > left && x < rigth && y > top && y < bottom;
     }
 
     fn update(&mut self, dt: f32) {
-        let s = self.anim*0.1 + 1.0;
-        self.sprite.set_heigh_prop(self.height*s);
+        let s = self.anim * 0.1 + 1.0;
+        self.sprite.set_heigh_prop(self.height * s);
         if self.is_over {
-            self.anim = (self.anim + dt*6.0).min(1.0);
+            self.anim = (self.anim + dt * 6.0).min(1.0);
         } else {
-            self.anim = (self.anim - dt*6.0).max(0.0);
+            self.anim = (self.anim - dt * 6.0).max(0.0);
         }
     }
 }
@@ -861,21 +909,22 @@ pub struct Game<R: Rng> {
     in_menu: bool,
 }
 impl<R: Rng> Game<R> {
-
     pub fn new(texture: u32, rng: R) -> Self {
         Self {
             background_painel: SpriteInstance::new(0.0, 0.0, 2.2, 2.2, texture, atlas::PAINEL),
             start_button: Button::new(
-                SpriteInstance::new_height_prop(0.0, 0.0, 0.5, texture, atlas::START_BUTTON),
+                SpriteInstance::new_height_prop(0.0, 0.0, 0.5, texture, atlas::START_BUTTON)
+                    .with_color([0, 230, 0, 255]),
                 [-0.62, 0.62, -0.20, 0.20],
             ),
             close_button: Button::new(
-                SpriteInstance::new_height_prop(0.0, 0.5, 0.25, texture, atlas::CLOSE_BUTTON),
+                SpriteInstance::new_height_prop(0.0, 0.5, 0.25, texture, atlas::CLOSE_BUTTON)
+                    .with_color([0, 150, 0, 255]),
                 [-0.65, 0.65, -0.20, 0.20],
             ),
             back_button: Button::new(
                 SpriteInstance::new_height_prop(0.0, 0.5, 0.25, texture, atlas::ARROW)
-                    .with_color([0, 255, 0, 255]),
+                    .with_color([0, 240, 0, 255]),
                 [-0.12, 0.12, -0.12, 0.12],
             ),
             board: GameBoard::new(texture, rng),
@@ -890,13 +939,14 @@ impl<R: Rng> Game<R> {
             self.close_button.mouse_input(input.mouse_x, input.mouse_y);
             self.close_button.update(dt);
             if input.mouse_left_state == 3 {
-                if self.start_button.is_over { 
+                if self.start_button.is_over {
                     self.in_menu = false;
                     self.board.reset();
-                    crate::audio_engine().new_sound(
-                        WavDecoder::new(Cursor::new(sounds::CLICK))
-                    ).unwrap().play();
-                } else if self.close_button.is_over { 
+                    crate::audio_engine()
+                        .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
+                        .unwrap()
+                        .play();
+                } else if self.close_button.is_over {
                     std::process::exit(0);
                 }
             }
@@ -904,15 +954,20 @@ impl<R: Rng> Game<R> {
             self.back_button.mouse_input(input.mouse_x, input.mouse_y);
             self.back_button.update(dt);
 
-            if input.mouse_left_state == 3 && self.back_button.is_over { 
+            if input.mouse_left_state == 3 && self.back_button.is_over {
                 self.in_menu = true;
             }
 
-            self.board.mouse_input(input.mouse_x, input.mouse_y, if input.mouse_left_state == 3 {
+            self.board.mouse_input(
+                input.mouse_x,
+                input.mouse_y,
+                if input.mouse_left_state == 3 {
                     1
                 } else if input.mouse_rigth_state == 3 {
                     2
-                } else { 0 }
+                } else {
+                    0
+                },
             );
             self.board.animate(dt);
         }
@@ -923,14 +978,14 @@ impl<R: Rng> Game<R> {
         let prop = width as f32 / height as f32;
         if prop > 1.0 {
             let x;
-            if prop  > 1280.0/720.0 {
-                x = - 1.1 - (1280.0/720.0 - 1.0) * 1.1 / 2.0;
-            } else if prop > 1280.0/720.0/2.0 + 0.65 {
-                let l = - width + 1.1*1280.0/720.0;
-                x = (l - 1.1)/2.0;
-            } else if prop > 1280.0/720.0/2.0 + 0.5 {
-                x = 1.1*1280.0/720.0 - 0.2;
-            }else {
+            if prop > 1280.0 / 720.0 {
+                x = -1.1 - (1280.0 / 720.0 - 1.0) * 1.1 / 2.0;
+            } else if prop > 1280.0 / 720.0 / 2.0 + 0.65 {
+                let l = -width + 1.1 * 1280.0 / 720.0;
+                x = (l - 1.1) / 2.0;
+            } else if prop > 1280.0 / 720.0 / 2.0 + 0.5 {
+                x = 1.1 * 1280.0 / 720.0 - 0.2;
+            } else {
                 x = width - 1.1 - 0.2;
             }
             self.back_button.sprite.set_position(x, -0.9);
@@ -941,9 +996,16 @@ impl<R: Rng> Game<R> {
 
     pub fn get_sprites(&mut self) -> Vec<SpriteInstance> {
         if self.in_menu {
-            vec![self.background_painel.clone(), self.start_button.sprite.clone(), self.close_button.sprite.clone()]
+            vec![
+                self.background_painel.clone(),
+                self.start_button.sprite.clone(),
+                self.close_button.sprite.clone(),
+            ]
         } else {
-            let mut vec = vec![self.back_button.sprite.clone(), self.background_painel.clone()];
+            let mut vec = vec![
+                self.back_button.sprite.clone(),
+                self.background_painel.clone(),
+            ];
             vec.append(&mut self.board.get_sprites());
             vec
         }
