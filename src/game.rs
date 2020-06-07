@@ -6,7 +6,6 @@ use sprite_render::SpriteInstance;
 use rand::seq::index::sample;
 use rand::Rng;
 
-use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::io::Cursor;
 
@@ -20,18 +19,18 @@ fn lerp(t: f32, a: f32, b: f32) -> f32 {
 }
 
 const COLORS: &[[u8; 4]] = &[
-    [0xff, 0x00, 0x00, 0xff],
-    [0x00, 0xff, 0x00, 0xff],
-    [0x00, 0x00, 0xff, 0xff], // red, green, ~blue
-    [0xff, 0xff, 0x00, 0xff],
-    [0xff, 0x00, 0xff, 0xff],
-    [0x00, 0xff, 0xff, 0xff], // yellow, purple, cyan
-    [0xff, 0x7f, 0x00, 0xff],
-    [0xff, 0xff, 0xff, 0xff],
-    [0xb2, 0xb2, 0xb2, 0xff], // orange, white, gray
-    [0x99, 0x16, 0x00, 0xff],
-    [0xb2, 0xb2, 0x00, 0xff],
-    [0x48, 0x48, 0x48, 0xff], // brown, dark_yellow, black
+    [0xff, 0x00, 0x00, 0xff], //  0: red
+    [0x00, 0xff, 0x00, 0xff], //  1: green
+    [0x00, 0x00, 0xff, 0xff], //  2: ~blue
+    [0xff, 0xff, 0x00, 0xff], //  3: yellow
+    [0xff, 0x00, 0xff, 0xff], //  4: purple
+    [0x00, 0xff, 0xff, 0xff], //  5: cyan
+    [0xff, 0x7f, 0x00, 0xff], //  6: orange
+    [0xff, 0xff, 0xff, 0xff], //  7: white
+    [0xb2, 0xb2, 0xb2, 0xff], //  8: gray
+    [0x99, 0x16, 0x00, 0xff], //  9: brow
+    [0xb2, 0xb2, 0x00, 0xff], // 10: dark_yellow
+    [0x48, 0x48, 0x48, 0xff], // 11: black
 ];
 
 mod atlas {
@@ -169,7 +168,8 @@ struct GameBoard<R: Rng> {
     regions: Vec<u16>,
     region_id_pool: Vec<u16>,
     number_regions: u16,
-    region_size: HashMap<u16, u16>,
+    color_pool: Vec<u16>,
+    number_colors: u16,
     texture: u32,
     win_anim: f32,
     lose_anim: f32,
@@ -206,7 +206,8 @@ impl<R: Rng> GameBoard<R> {
             regions: Vec::new(),
             region_id_pool: Vec::new(),
             number_regions: 0,
-            region_size: HashMap::new(),
+            color_pool: Vec::new(),
+            number_colors: 0,
             win_anim: 0.0,
             lose_anim: 0.0,
             win_sprite: SpriteInstance::new(0.0, 0.0, 1.0, 1.0, texture, atlas::YOU_WIN),
@@ -268,8 +269,9 @@ impl<R: Rng> GameBoard<R> {
         self.width = width;
         self.height = height;
         self.region_id_pool.clear();
-        self.region_size.clear();
         self.number_regions = 0;
+        self.color_pool.clear();
+        self.number_colors = 0;
         self.pipes = Vec::with_capacity(width as usize * height as usize);
         self.life_time = 1.0;
         let maze = Self::gen_maze(width, height, &mut self.rng);
@@ -360,18 +362,41 @@ impl<R: Rng> GameBoard<R> {
     fn add_region_to_pool(&mut self, region: u16) {
         if region != 0 && !self.region_id_pool.iter().any(|&x| x == region) {
             self.region_id_pool.push(region);
-            self.region_size.remove(&region);
+        }
+    }
+
+    fn next_color(&mut self) -> u16 {
+        if self.color_pool.is_empty() {
+            self.number_colors += 1;
+            self.number_colors
+        } else {
+            self.color_pool.pop().unwrap()
+        }
+    }
+
+    // If a color is not more used, it is add back to the pool
+    fn add_color_to_pool(&mut self, color: u16) {
+        if !self.color_pool.iter().any(|&x| x == color) {
+            self.color_pool.push(color);
+        }
+    }
+
+    // Remove a color from to pool to be used
+    fn remove_color_from_pool(&mut self, color: u16) {
+        match self.color_pool.iter().position(|&x| x == color) {
+            Some(i) => {
+                self.color_pool.swap_remove(i);
+            }
+            None => panic!("there is no way that I will remove a color wich is not in the pool"),
         }
     }
 
     fn trace_region(&mut self, start: i32, region: u16) {
         let neights: [i32; 4] = [1, self.width as i32, -1, -(self.width as i32)];
         let mut explore: Vec<i32> = vec![start];
-        self.pipes[start as usize].change_color(region);
         self.regions[start as usize] = region;
         let mut visited = vec![false; self.width as usize * self.height as usize];
         visited[start as usize] = true;
-        let mut count = 1u16;
         while let Some(curr) = explore.pop() {
             let curr_dir = match self.pipes[curr as usize].kind {
                 0 => 0b00010001u8,
@@ -403,26 +428,26 @@ impl<R: Rng> GameBoard<R> {
                         explore.push(next as i32);
                         self.regions[next] = region;
                         visited[next] = true;
-                        self.pipes[next].change_color(region);
-                        count += 1;
                     }
                 }
             }
         }
-
-        self.region_size.insert(region, count);
     }
 
     fn trace_regions(&mut self) {
         self.regions = vec![0u16; self.width as usize * self.height as usize];
 
-        let mut region;
+        // let mut region;
         for i in 0..(self.width as usize * self.height as usize) {
             if self.regions[i] == 0 {
-                region = self.next_region_id(0);
+                let region = self.next_region_id(0);
                 self.trace_region(i as i32, region);
             }
         }
+        for i in 0..(self.width as usize * self.height as usize) {
+            self.pipes[i].change_color(self.regions[i] - 1);
+        }
+        self.number_colors = self.number_regions;
     }
 
     fn update_regions(&mut self, i: i32) {
@@ -436,30 +461,74 @@ impl<R: Rng> GameBoard<R> {
                 && next < self.regions.len()
             {
                 to_check.push((next, self.regions[next]));
+                self.add_region_to_pool(self.regions[next]);
                 self.regions[next] = 0;
             }
         }
 
-        to_check.sort_by_key(|(_, x)| u16::max_value() - self.region_size.get(x).unwrap());
-
         to_check.push((i as usize, self.regions[i as usize]));
+        self.add_region_to_pool(self.regions[i as usize]);
         self.regions[i as usize] = 0;
 
-        // print!("to_check:");
-        // for (p, r) in to_check.iter() {
-        //     print!(" {:2} {:2};", p, r);
-        // }
-        // println!();
-
-        for &(_, region) in to_check.iter() {
-            self.add_region_to_pool(region);
+        for (curr, region) in to_check.iter_mut() {
+            if self.regions[*curr] == 0 {
+                *region = self.next_region_id(*region);
+                self.trace_region(*curr as i32, *region);
+            }
         }
-
-        let mut region: u16;
-        for (curr, preference) in to_check.into_iter() {
-            if self.regions[curr] == 0 {
-                region = self.next_region_id(preference);
-                self.trace_region(curr as i32, region);
+        let mut colors = Vec::new();
+        let mut start = 0;
+        let mut used_regions = Vec::new(); //TODO: check used in insertion time
+        for (_, region) in to_check.iter() {
+            if used_regions.iter().any(|x| *x == *region) {
+                continue;
+            }
+            used_regions.push(*region);
+            let mut has_some_region = false;
+            for i in 0..(self.width as usize * self.height as usize) {
+                if self.regions[i] == *region {
+                    has_some_region = true;
+                    let color = self.pipes[i].target_color;
+                    match colors[start..].iter().position(|(_, x, _)| *x == color) {
+                        Some(i) => {
+                            colors[start + i].2 += 1;
+                        }
+                        None => {
+                            colors.push((*region, color, 1));
+                            self.add_color_to_pool(color);
+                        }
+                    }
+                }
+            }
+            if !has_some_region {
+                used_regions.pop();
+            }
+            start = colors.len();
+        }
+        colors.sort_by_key(|x| x.2);
+        let mut used_colors = Vec::new();
+        while let Some((region, color, _)) = colors.pop() {
+            if used_colors.iter().any(|x| *x == color) {
+                continue;
+            }
+            used_colors.push(color);
+            match used_regions.iter().position(|x| *x == region) {
+                Some(i) => used_regions.swap_remove(i),
+                None => continue,
+            };
+            self.remove_color_from_pool(color);
+            for i in 0..(self.width as usize * self.height as usize) {
+                if self.regions[i] == region {
+                    self.pipes[i].change_color(color);
+                }
+            }
+        }
+        for region in used_regions {
+            let color = self.next_color();
+            for i in 0..(self.width as usize * self.height as usize) {
+                if self.regions[i] == region {
+                    self.pipes[i].change_color(color);
+                }
             }
         }
     }
@@ -545,7 +614,7 @@ impl<R: Rng> GameBoard<R> {
         let neights: [i32; 2] = [1, self.width as i32];
 
         // if there is more than one region, it is not done
-        if self.region_size.len() > 1 {
+        if self.number_regions as usize - self.region_id_pool.len() > 1 {
             return false;
         }
 
