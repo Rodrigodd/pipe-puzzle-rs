@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use audio_engine::{AudioEngine, OggDecoder};
+use audio_engine::{AudioEngine, OggDecoder, WavDecoder};
 use sprite_render::{default_render, Camera, SpriteRender};
 
 use winit::{
@@ -17,6 +17,8 @@ use time::Instant;
 
 mod game;
 use game::Game;
+
+mod audio_effect;
 
 fn audio_engine() -> &'static AudioEngine {
     use std::sync::Once;
@@ -78,13 +80,16 @@ fn main() {
             true,
         )
     };
+    let music = OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..]));
+    let music = audio_effect::SlowDown::new(music);
+    let slow_down_ref = music.slow_down.clone();
+    let music = audio_effect::WithIntro::new(
+        WavDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe-intro.wav")[..])),
+        music,
+    );
+    let in_intro_ref = music.in_intro.clone();
 
-    let mut music = audio_engine()
-        .new_sound(OggDecoder::new(Cursor::new(
-            &include_bytes!("../res/sound/pipe.ogg")[..],
-        )))
-        .unwrap();
-    music.set_loop(true);
+    let mut music = audio_engine().new_sound(music).unwrap();
     music.play();
 
     use rand::SeedableRng;
@@ -96,6 +101,9 @@ fn main() {
                 .unwrap()
                 .as_millis() as u64,
         ),
+        music,
+        slow_down_ref,
+        in_intro_ref,
     );
     let mut camera = Camera::new(window.inner_size(), 2.2);
     camera.set_position(0.0, 0.0);

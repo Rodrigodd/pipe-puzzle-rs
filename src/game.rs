@@ -1,6 +1,6 @@
 #![allow(clippy::needless_range_loop)]
 
-use audio_engine::WavDecoder;
+use audio_engine::{Sound, WavDecoder};
 use sprite_render::SpriteInstance;
 
 use rand::seq::index::sample;
@@ -8,6 +8,8 @@ use rand::Rng;
 
 use std::f32::consts::PI;
 use std::io::Cursor;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use crate::time::Instant;
 
@@ -170,6 +172,8 @@ impl Input {
 }
 
 struct GameBoard<R: Rng> {
+    music: Sound,
+    slow_down_effect: Arc<AtomicBool>,
     width: u8,
     height: u8,
     pipes: Vec<Pipe>,
@@ -202,12 +206,14 @@ struct GameBoard<R: Rng> {
     rng: R,
 }
 impl<R: Rng> GameBoard<R> {
-    pub fn new(texture: u32, rng: R) -> Self {
+    pub fn new(texture: u32, rng: R, music: Sound, slow_down_effect: Arc<AtomicBool>) -> Self {
         let mut highlight_sprite =
             SpriteInstance::new(-100.0, 0.0, 1.0, 1.0, texture, atlas::BLANCK);
         highlight_sprite.set_color([255, 255, 255, 64]);
 
-        let mut this = Self {
+        Self {
+            music,
+            slow_down_effect,
             width: 0,
             height: 0,
             pipes: Vec::new(),
@@ -244,12 +250,12 @@ impl<R: Rng> GameBoard<R> {
             game_start: Instant::now(),
             level_start: Instant::now(),
             rng,
-        };
-        this.reset();
-        this
+        }
     }
 
     pub fn reset(&mut self) {
+        self.music.reset();
+        self.music.play();
         self.win_anim = 0.0;
         self.lose_anim = 0.0;
         self.again_button
@@ -338,8 +344,8 @@ impl<R: Rng> GameBoard<R> {
 
         self.expect_min_click_count = total_diff;
         let area = self.width as u32 * self.height as u32;
-        let expect_time = 30.0 + 0.307 * area as f32 + 0.00120 * area as f32 * area as f32;
-        let expect_click = 30.0 + 0.542 * area as f32 + 0.00154 * area as f32 * area as f32;
+        let expect_time = 30.0 + 0.307 * area as f32; // + 0.00120 * area as f32 * area as f32;
+        let expect_click = 30.0 + 0.542 * area as f32; // + 0.00154 * area as f32 * area as f32;
         self.add_life((expect_time * 2.0 + expect_click) as i32);
     }
 
@@ -757,6 +763,7 @@ impl<R: Rng> GameBoard<R> {
             .set_size(atlas::YOU_LOSE[2] / atlas::YOU_LOSE[3], 1.0);
         self.win_sprite.set_color([255, 0, 0, 255]);
         self.win_sprite.set_angle(0.0);
+        self.slow_down_effect.store(true, Ordering::Relaxed);
     }
 
     fn trigger_win(&mut self) {
@@ -985,6 +992,7 @@ impl Button {
 }
 
 pub struct Game<R: Rng> {
+    in_intro: Arc<AtomicBool>,
     background_painel: SpriteInstance,
     start_button: Button,
     close_button: Button,
@@ -993,8 +1001,9 @@ pub struct Game<R: Rng> {
     in_menu: bool,
 }
 impl<R: Rng> Game<R> {
-    pub fn new(texture: u32, rng: R) -> Self {
+    pub fn new(texture: u32, rng: R, music: Sound, slow_down_effect: Arc<AtomicBool>, in_intro: Arc<AtomicBool>) -> Self {
         Self {
+            in_intro,
             background_painel: SpriteInstance::new(0.0, 0.0, 2.2, 2.2, texture, atlas::PAINEL),
             start_button: Button::new(
                 SpriteInstance::new_height_prop(0.0, 0.0, 0.5, texture, atlas::START_BUTTON)
@@ -1011,7 +1020,7 @@ impl<R: Rng> Game<R> {
                     .with_color([0, 240, 0, 255]),
                 [-0.12, 0.12, -0.12, 0.12],
             ),
-            board: GameBoard::new(texture, rng),
+            board: GameBoard::new(texture, rng, music, slow_down_effect),
             in_menu: true,
         }
     }
@@ -1025,6 +1034,7 @@ impl<R: Rng> Game<R> {
             if input.mouse_left_state == 3 {
                 if self.start_button.is_over {
                     self.in_menu = false;
+                    self.in_intro.store(false, Ordering::Relaxed);
                     self.board.reset();
                     crate::audio_engine()
                         .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
@@ -1040,6 +1050,7 @@ impl<R: Rng> Game<R> {
 
             if input.mouse_left_state == 3 && self.back_button.is_over {
                 self.in_menu = true;
+                self.in_intro.store(true, Ordering::Relaxed);
             }
 
             self.board.mouse_input(
