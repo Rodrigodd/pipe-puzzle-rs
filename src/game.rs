@@ -1,7 +1,9 @@
 #![allow(clippy::needless_range_loop)]
 
 use audio_engine::{Sound, WavDecoder};
-use sprite_render::SpriteInstance;
+use sprite_render::{SpriteInstance, SpriteRender, Camera};
+
+use winit::dpi::PhysicalSize;
 
 use rand::seq::index::sample;
 use rand::Rng;
@@ -123,16 +125,18 @@ impl Pipe {
 
     /// Is called when there is a mouse click over self.
     /// When right is true it is a right mouse button click, otherwise is left.
-    fn click(&mut self, right: bool) {
+    fn click(&mut self, right: bool, play_sound: bool) {
         if right {
             self.dir = (self.dir + 1) % 4;
         } else {
             self.dir = (self.dir + 4 - 1) % 4;
         }
-        crate::audio_engine()
-            .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
-            .unwrap()
-            .play();
+        if play_sound {
+            crate::audio_engine()
+                .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
+                .unwrap()
+                .play();
+        }
         self.anim_time = 1.0;
         self.previous_angle = self.angle;
     }
@@ -172,6 +176,7 @@ impl Input {
 }
 
 struct GameBoard<R: Rng> {
+    sound_effects: bool,
     music: Sound,
     slow_down_effect: Arc<AtomicBool>,
     width: u8,
@@ -210,8 +215,8 @@ impl<R: Rng> GameBoard<R> {
         let mut highlight_sprite =
             SpriteInstance::new(-100.0, 0.0, 1.0, 1.0, texture, atlas::BLANCK);
         highlight_sprite.set_color([255, 255, 255, 64]);
-
         Self {
+            sound_effects: true,
             music,
             slow_down_effect,
             width: 0,
@@ -254,7 +259,6 @@ impl<R: Rng> GameBoard<R> {
     }
 
     pub fn reset(&mut self) {
-        self.music.reset();
         self.music.play();
         self.win_anim = 0.0;
         self.lose_anim = 0.0;
@@ -772,10 +776,12 @@ impl<R: Rng> GameBoard<R> {
         self.win_sprite
             .set_size(atlas::YOU_WIN[2] / atlas::YOU_WIN[3], 1.0);
         self.win_sprite.set_color([255, 255, 255, 255]);
-        crate::audio_engine()
-            .new_sound(WavDecoder::new(Cursor::new(sounds::WHOOSH)))
-            .unwrap()
-            .play();
+        if self.sound_effects {
+            crate::audio_engine()
+                .new_sound(WavDecoder::new(Cursor::new(sounds::WHOOSH)))
+                .unwrap()
+                .play();
+        }
     }
 
     /// Receive the in world space coordinate of the mouse position.
@@ -807,7 +813,7 @@ impl<R: Rng> GameBoard<R> {
             } else {
                 let i = y * self.width as i32 + x;
                 self.click_count += 1;
-                self.pipes[i as usize].click(pressed != 1);
+                self.pipes[i as usize].click(pressed != 1, self.sound_effects);
                 self.update_regions(i);
                 let new_max = self.count_connections();
                 if new_max > self.level_score {
@@ -991,19 +997,34 @@ impl Button {
     }
 }
 
-pub struct Game<R: Rng> {
-    in_intro: Arc<AtomicBool>,
+pub struct Game<R: Rng, S: SpriteRender> {
+    camera: Camera,
+    render: S,
     background_painel: SpriteInstance,
     start_button: Button,
     close_button: Button,
+    music_button: Button,
+    audio_button: Button,
     back_button: Button,
     board: GameBoard<R>,
     in_menu: bool,
 }
-impl<R: Rng> Game<R> {
-    pub fn new(texture: u32, rng: R, music: Sound, slow_down_effect: Arc<AtomicBool>, in_intro: Arc<AtomicBool>) -> Self {
+impl<R: Rng, S: SpriteRender> Game<R, S> {
+    pub fn new(rng: R, music: Sound, slow_down_effect: Arc<AtomicBool>, camera: Camera, mut render: S) -> Self {
+        let texture = {
+            let image = image::load_from_memory(include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png")))
+                .unwrap()
+                .to_rgba();
+            render.load_texture(
+                image.width(),
+                image.height(),
+                image.into_raw().as_slice(),
+                true,
+            )
+        };
         Self {
-            in_intro,
+            camera,
+            render,
             background_painel: SpriteInstance::new(0.0, 0.0, 2.2, 2.2, texture, atlas::PAINEL),
             start_button: Button::new(
                 SpriteInstance::new_height_prop(0.0, 0.0, 0.5, texture, atlas::START_BUTTON)
@@ -1020,42 +1041,83 @@ impl<R: Rng> Game<R> {
                     .with_color([0, 240, 0, 255]),
                 [-0.12, 0.12, -0.12, 0.12],
             ),
+            music_button: Button::new(
+                SpriteInstance::new_height_prop(0.0, 0.5, 0.15, texture, atlas::MUSIC)
+                    .with_color([0, 240, 0, 255]),
+                [-0.07, 0.07, -0.07, 0.07],
+            ),
+            audio_button: Button::new(
+                SpriteInstance::new_height_prop(0.0, 0.5, 0.15, texture, atlas::SOUND)
+                    .with_color([0, 240, 0, 255]),
+                [-0.07, 0.07, -0.07, 0.07],
+            ),
             board: GameBoard::new(texture, rng, music, slow_down_effect),
             in_menu: true,
         }
     }
 
     pub fn update(&mut self, dt: f32, input: &Input) {
+        let (mouse_x, mouse_y) = self.camera.position_to_word_space(input.mouse_x, input.mouse_y);
+
+        self.music_button.mouse_input(mouse_x, mouse_y);
+        self.audio_button.mouse_input(mouse_x, mouse_y);
+        if input.mouse_left_state == 3 {
+            if self.music_button.is_over {
+                if self.music_button.anim == 0.0 {
+                    self.music_button.sprite.set_uv_rect(atlas::MUSIC_OFF);
+                    self.music_button.anim = 1.0;
+                    self.board.music.set_volume(0.0);
+                } else {
+                    self.music_button.sprite.set_uv_rect(atlas::MUSIC);
+                    self.music_button.anim = 0.0;
+                    self.board.music.set_volume(1.0);
+                }
+            }
+            if self.audio_button.is_over {
+                if self.audio_button.anim == 0.0 {
+                    self.audio_button.sprite.set_uv_rect(atlas::SOUND_OFF);
+                    self.audio_button.anim = 1.0;
+                    self.board.sound_effects = false;
+                } else {
+                    self.audio_button.sprite.set_uv_rect(atlas::SOUND);
+                    self.audio_button.anim = 0.0;
+                    self.board.sound_effects = true;
+                }
+            }
+        }
+
         if self.in_menu {
-            self.start_button.mouse_input(input.mouse_x, input.mouse_y);
+            self.start_button.mouse_input(mouse_x, mouse_y);
             self.start_button.update(dt);
-            self.close_button.mouse_input(input.mouse_x, input.mouse_y);
+            self.close_button.mouse_input(mouse_x, mouse_y);
             self.close_button.update(dt);
             if input.mouse_left_state == 3 {
                 if self.start_button.is_over {
                     self.in_menu = false;
-                    self.in_intro.store(false, Ordering::Relaxed);
+                    self.update_layout();
                     self.board.reset();
-                    crate::audio_engine()
-                        .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
-                        .unwrap()
-                        .play();
+                    if self.board.sound_effects {
+                        crate::audio_engine()
+                            .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
+                            .unwrap()
+                            .play();
+                    }
                 } else if self.close_button.is_over {
                     std::process::exit(0);
                 }
             }
         } else {
-            self.back_button.mouse_input(input.mouse_x, input.mouse_y);
+            self.back_button.mouse_input(mouse_x, mouse_y);
             self.back_button.update(dt);
 
             if input.mouse_left_state == 3 && self.back_button.is_over {
                 self.in_menu = true;
-                self.in_intro.store(true, Ordering::Relaxed);
+                self.update_layout();
             }
 
             self.board.mouse_input(
-                input.mouse_x,
-                input.mouse_y,
+                mouse_x,
+                mouse_y,
                 if input.mouse_left_state == 3 {
                     1
                 } else if input.mouse_rigth_state == 3 {
@@ -1068,9 +1130,66 @@ impl<R: Rng> Game<R> {
         }
     }
 
-    pub fn resize(&mut self, width: f32, height: f32) {
+    pub fn render(&mut self) {
+        let sprites = self.get_sprites();
+        self.render
+            .render()
+            .clear_screen(&[0.0f32, 0.25, 0.0, 1.0])
+            .draw_sprites(&mut self.camera, &sprites)
+            .finish();
+    }
+
+    pub fn resize(&mut self, size: PhysicalSize<u32>) {
+        self.camera.resize(size);
+        self.render.resize(size.width, size.height);
+        self.update_layout();
+    }
+
+    pub fn update_layout(&mut self) {
+        let prop = self.camera.width() as f32 / self.camera.height() as f32;
+        if !self.in_menu {
+            if prop > 1.0 {
+                // landscape
+                if prop > 1280.0 / 720.0 {
+                    self.camera.set_position(0.0, 0.0);
+                } else if prop > 1280.0 / 720.0 / 2.0 + 0.5 {
+                    self.camera.set_position(-self.camera.width() as f32 / 2.0 + 1.1 * 1280.0 / 720.0, 0.0);
+                } else {
+                    self.camera.set_position(self.camera.width() as f32 / 2.0 - 1.1, 0.0);
+                }
+            } else {
+                // portrait
+                if prop < 720.0 / 1280.0 {
+                    self.camera.set_position(0.0, 0.0);
+                } else if prop < 1.0 / (1280.0 / 720.0 / 2.0 + 0.5) {
+                    self.camera.set_position(0.0, self.camera.height() as f32 / 2.0 - 1.1 * 1280.0 / 720.0);
+                } else {
+                    self.camera.set_position(0.0, -self.camera.height() as f32 / 2.0 + 1.1);
+                }
+            }
+        } else {
+            self.camera.set_position(0.0, 0.0);
+        }
+
+        let width = self.camera.width();
+        let height = self.camera.height();
         self.board.resize(width, height);
-        let prop = width as f32 / height as f32;
+
+        if self.in_menu {
+            self.music_button.sprite.set_position(0.95, 0.95);
+            self.audio_button.sprite.set_position(0.75, 0.95);
+        } else {
+            let right_side = width / 2.0 + self.camera.get_position().0;
+            if prop > 1.0 {
+                self.music_button.sprite.set_position(right_side - 0.15, 0.95);
+                self.audio_button.sprite.set_position(right_side - 0.35, 0.95);
+            } else {
+                let top_side = -height / 2.0 + self.camera.get_position().1;
+                self.music_button.sprite.set_position(right_side - 0.15, top_side + 0.15);
+                self.audio_button.sprite.set_position(right_side - 0.35, top_side + 0.15);
+            }
+        }
+
         if prop > 1.0 {
             let x;
             if prop > 1280.0 / 720.0 {
@@ -1095,10 +1214,14 @@ impl<R: Rng> Game<R> {
                 self.background_painel.clone(),
                 self.start_button.sprite.clone(),
                 self.close_button.sprite.clone(),
+                self.music_button.sprite.clone(),
+                self.audio_button.sprite.clone(),
             ]
         } else {
             let mut vec = vec![
                 self.back_button.sprite.clone(),
+                self.music_button.sprite.clone(),
+                self.audio_button.sprite.clone(),
                 self.background_painel.clone(),
             ];
             vec.append(&mut self.board.get_sprites());

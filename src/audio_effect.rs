@@ -2,19 +2,17 @@ use audio_engine::SoundSource;
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::Arc;
 
-// Keep the intro in loop until 'in_intro' is false,
-// and then keep the music in loop, until 'in_intro' is true
+// Play the intro once,
+// and then keep the music in loop
 pub struct WithIntro<T: SoundSource, S: SoundSource> {
-    pub in_intro: Arc<AtomicBool>,
-    curr: u8,
+    in_intro: bool,
     intro: T,
     music: S,
 }
 impl<T: SoundSource, S: SoundSource> WithIntro<T, S> {
     pub fn new(intro: T, music: S) -> Self {
         Self {
-            in_intro: Arc::new(true.into()),
-            curr: 0,
+            in_intro: true,
             intro,
             music,
         }
@@ -28,40 +26,21 @@ impl<T: SoundSource, S: SoundSource> SoundSource for WithIntro<T, S> {
         self.music.sample_rate()
     }
     fn reset(&mut self) {
-        // self.intro.reset();
-        // self.music.reset();
-        // self.in_intro.store(true, Ordering::Relaxed);
+        self.music.reset();
     }
     fn write_samples(&mut self, buffer: &mut [i16]) -> usize {
         let mut len = 0;
         loop {
-            break if self.curr == 0 {
+            break if self.in_intro {
                 len += self.intro.write_samples(&mut buffer[len..]);
                 if len < buffer.len() {
                     self.intro.reset();
-                    if self.in_intro.load(Ordering::Relaxed) {
-                        self.curr = 0;
-                        println!("not the music");
-                    } else {
-                        println!("Start the music!");
-                        self.curr = 1;
-                    }
+                    self.in_intro = false;
                     continue;
                 }
                 len
             } else {
                 len += self.music.write_samples(&mut buffer[len..]);
-                if len < buffer.len() {
-                    self.music.reset();
-                    if self.in_intro.load(Ordering::Relaxed) {
-                        println!("continue the music");
-                        self.curr = 0;
-                    } else {
-                        println!("came back to intro");
-                        self.curr = 1;
-                    }
-                    continue;
-                }
                 len
             }
         }
@@ -89,9 +68,6 @@ impl<T: SoundSource> SlowDown<T> {
             speed: 1.0,
         }
     }
-    // pub fn trigger_slow(&self) {
-    //     self.slow_down.store(true, Ordering::Relaxed);
-    // }
 }
 impl<T: SoundSource> SoundSource for SlowDown<T> {
     fn channels(&self) -> u16 {

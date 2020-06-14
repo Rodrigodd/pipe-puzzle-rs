@@ -28,57 +28,24 @@ fn audio_engine() -> &'static AudioEngine {
     unsafe { AUDIO_ENGINE.as_ref().unwrap() }
 }
 
-fn resize<R: SpriteRender + ?Sized, T: Rng>(
-    size: PhysicalSize<u32>,
-    render: &mut R,
-    camera: &mut Camera,
-    game: &mut Game<T>,
-) {
-    render.resize(size.width, size.height);
-    camera.resize(size);
-    let prop = size.width as f32 / size.height as f32;
-    if prop > 1.0 {
-        // landscape
-        if prop > 1280.0 / 720.0 {
-            camera.set_position(0.0, 0.0);
-        } else if prop > 1280.0 / 720.0 / 2.0 + 0.5 {
-            camera.set_position(-camera.width() as f32 / 2.0 + 1.1 * 1280.0 / 720.0, 0.0);
-        } else {
-            camera.set_position(camera.width() as f32 / 2.0 - 1.1, 0.0);
-        }
-    } else {
-        // portrait
-        if prop < 720.0 / 1280.0 {
-            camera.set_position(0.0, 0.0);
-        } else if prop < 1.0 / (1280.0 / 720.0 / 2.0 + 0.5) {
-            camera.set_position(0.0, camera.height() as f32 / 2.0 - 1.1 * 1280.0 / 720.0);
-        } else {
-            camera.set_position(0.0, -camera.height() as f32 / 2.0 + 1.1);
-        }
-    }
-    game.resize(camera.width(), camera.height());
-    game.update(0.0, &game::Input::default());
-}
-
 fn main() {
-    let events_loop = EventLoop::new();
+    let event_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("Hello world!")
         .with_inner_size(LogicalSize::new(768.0, 553.0))
         .with_visible(false);
 
     // create the SpriteRender
-    let (window, mut render) = default_render(wb, &events_loop, true);
-    let pipe_texture = {
-        let image = image::load_from_memory(include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png")))
-            .unwrap()
-            .to_rgba();
-        render.load_texture(
-            image.width(),
-            image.height(),
-            image.into_raw().as_slice(),
-            true,
-        )
+    let (window, render) = {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "opengl")] {
+                sprite_render::GLSpriteRender::new(wb, &event_loop, true)
+            } else if #[cfg(feature = "webgl")] {
+                sprite_render::WebGLSpriteRender::new(wb, &event_loop)
+            } else {
+                (wb.build(&event_loop).unwrap(), sprite_render::EmptySpriteRender)
+            }
+        }
     };
     let music = OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..]));
     let music = audio_effect::SlowDown::new(music);
@@ -87,14 +54,13 @@ fn main() {
         WavDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe-intro.wav")[..])),
         music,
     );
-    let in_intro_ref = music.in_intro.clone();
 
     let mut music = audio_engine().new_sound(music).unwrap();
     music.play();
 
     use rand::SeedableRng;
+    let camera = Camera::new(window.inner_size(), 2.2);
     let mut game = Game::new(
-        pipe_texture,
         rand::rngs::SmallRng::seed_from_u64(
             time::SystemTime::now()
                 .duration_since(time::UNIX_EPOCH)
@@ -103,22 +69,19 @@ fn main() {
         ),
         music,
         slow_down_ref,
-        in_intro_ref,
+        camera,
+        render,
     );
-    let mut camera = Camera::new(window.inner_size(), 2.2);
-    camera.set_position(0.0, 0.0);
 
     let mut clock = Instant::now();
     let mut frame_count = 0;
-
-    game.resize(1280.0, 720.0);
 
     let mut cursor = PhysicalPosition::new(0.0, 0.0);
 
     let mut input = game::Input::default();
     window.set_visible(true);
-    resize(window.inner_size(), render.as_mut(), &mut camera, &mut game);
-    events_loop.run(move |event, _, control_flow| {
+    game.resize(window.inner_size());
+    event_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Poll;
         match event {
             Event::WindowEvent { event, window_id } if window_id == window.id() => match event {
@@ -138,12 +101,11 @@ fn main() {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     cursor = position;
-                    let (x, y) = camera.position_to_word_space(cursor.x as f32, cursor.y as f32);
-                    input.mouse_x = x;
-                    input.mouse_y = y;
+                    input.mouse_x = cursor.x as f32;
+                    input.mouse_y = cursor.y as f32;
                 }
                 WindowEvent::Resized(size) => {
-                    resize(size, render.as_mut(), &mut camera, &mut game);
+                    game.resize(size);
                 }
                 _ => (),
             },
@@ -170,11 +132,7 @@ fn main() {
                     clock = Instant::now();
                     window.set_title(&format!("PipeMania | {:9.2} FPS", 60.0 / elapsed));
                 }
-                render
-                    .render()
-                    .clear_screen(&[0.0f32, 0.25, 0.0, 1.0])
-                    .draw_sprites(&mut camera, &game.get_sprites())
-                    .finish();
+                game.render();
             }
             _ => (),
         }
