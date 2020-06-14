@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use audio_engine::{AudioEngine, OggDecoder, WavDecoder};
+use audio_engine::{AudioEngine, OggDecoder};
 use sprite_render::{default_render, Camera, SpriteRender};
 
 use winit::{
@@ -63,12 +63,12 @@ fn main() {
             }
         }
     };
-    
+
     let music = OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..]));
     let music = audio_effect::SlowDown::new(music);
     let slow_down_ref = music.slow_down.clone();
     let music = audio_effect::WithIntro::new(
-        WavDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe-intro.wav")[..])),
+        OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe-intro.ogg")[..])),
         music,
     );
 

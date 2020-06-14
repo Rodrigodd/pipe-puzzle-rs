@@ -53,6 +53,8 @@ mod atlas {
 
 mod sounds {
     pub static CLICK: &[u8] = include_bytes!("../res/sound/click.wav");
+    pub static CONFIRM: &[u8] = include_bytes!("../res/sound/confirm.wav");
+    pub static NEGATE: &[u8] = include_bytes!("../res/sound/negate.wav");
     pub static WHOOSH: &[u8] = include_bytes!("../res/sound/whoosh.wav");
 }
 
@@ -1095,7 +1097,7 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
                 self.board.reset();
                 if self.board.sound_effects {
                     crate::audio_engine()
-                        .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
+                        .new_sound(WavDecoder::new(Cursor::new(sounds::CONFIRM)))
                         .unwrap()
                         .play();
                 }
@@ -1114,6 +1116,12 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
             if input.mouse_left_state == 3 && self.back_button.is_over {
                 self.in_menu = true;
                 self.update_layout();
+                if self.board.sound_effects {
+                    crate::audio_engine()
+                        .new_sound(WavDecoder::new(Cursor::new(sounds::NEGATE)))
+                        .unwrap()
+                        .play();
+                }
             }
 
             self.board.mouse_input(
