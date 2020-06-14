@@ -34,6 +34,22 @@ fn main() {
         .with_title("Hello world!")
         .with_inner_size(LogicalSize::new(768.0, 553.0))
         .with_visible(false);
+    
+    #[cfg(target_arch = "wasm32")]
+    let wb = {
+        use winit::platform::web::WindowBuilderExtWebSys;
+        use wasm_bindgen::prelude::*;
+        use wasm_bindgen::JsCast;
+
+        let document = web_sys::window().unwrap().document().unwrap();
+        let canvas = document.get_element_by_id("main_canvas").unwrap();
+        let canvas: web_sys::HtmlCanvasElement = canvas
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .map_err(|_| ())
+            .unwrap();
+        
+        wb.with_canvas(Some(canvas))
+    };
 
     // create the SpriteRender
     let (window, render) = {
@@ -47,6 +63,7 @@ fn main() {
             }
         }
     };
+    
     let music = OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..]));
     let music = audio_effect::SlowDown::new(music);
     let slow_down_ref = music.slow_down.clone();

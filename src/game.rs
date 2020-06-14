@@ -1089,20 +1089,21 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
         if self.in_menu {
             self.start_button.mouse_input(mouse_x, mouse_y);
             self.start_button.update(dt);
-            self.close_button.mouse_input(mouse_x, mouse_y);
-            self.close_button.update(dt);
-            if input.mouse_left_state == 3 {
-                if self.start_button.is_over {
-                    self.in_menu = false;
-                    self.update_layout();
-                    self.board.reset();
-                    if self.board.sound_effects {
-                        crate::audio_engine()
-                            .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
-                            .unwrap()
-                            .play();
-                    }
-                } else if self.close_button.is_over {
+            if input.mouse_left_state == 3 && self.start_button.is_over {
+                self.in_menu = false;
+                self.update_layout();
+                self.board.reset();
+                if self.board.sound_effects {
+                    crate::audio_engine()
+                        .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
+                        .unwrap()
+                        .play();
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))] {
+                self.close_button.mouse_input(mouse_x, mouse_y);
+                self.close_button.update(dt);
+                if input.mouse_left_state == 3 && self.close_button.is_over {
                     std::process::exit(0);
                 }
             }
@@ -1212,10 +1213,10 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
         if self.in_menu {
             vec![
                 self.background_painel.clone(),
-                self.start_button.sprite.clone(),
-                self.close_button.sprite.clone(),
                 self.music_button.sprite.clone(),
                 self.audio_button.sprite.clone(),
+                self.start_button.sprite.clone(),
+                #[cfg(not(target_arch = "wasm32"))] self.close_button.sprite.clone()
             ]
         } else {
             let mut vec = vec![
