@@ -1017,7 +1017,7 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
             let image = image::load_from_memory(include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png")))
                 .unwrap()
                 .to_rgba();
-            render.load_texture(
+            render.new_texture(
                 image.width(),
                 image.height(),
                 image.into_raw().as_slice(),
@@ -1149,7 +1149,7 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.camera.resize(size);
+        self.camera.resize(size.width, size.height);
         self.render.resize(size.width, size.height);
         self.update_layout();
     }

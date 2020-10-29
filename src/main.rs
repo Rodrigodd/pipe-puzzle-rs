@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use audio_engine::{AudioEngine, OggDecoder};
-use sprite_render::{default_render, Camera, SpriteRender};
+use sprite_render::{Camera, SpriteRender};
 
 use winit::{
     dpi::{LogicalSize, PhysicalPosition, PhysicalSize},
@@ -76,7 +76,8 @@ fn main() {
     music.play();
 
     use rand::SeedableRng;
-    let camera = Camera::new(window.inner_size(), 2.2);
+    let size = window.inner_size();
+    let camera = Camera::new(size.width, size.height, 2.2);
     let mut game = Game::new(
         rand::rngs::SmallRng::seed_from_u64(
             time::SystemTime::now()

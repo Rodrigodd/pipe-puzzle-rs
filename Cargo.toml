@@ -57,5 +57,5 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.adler32]
 opt-level = 3
-[profile.dev.package.inflate]
+[profile.dev.package.deflate]
 opt-level = 3
