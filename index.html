@@ -49,10 +49,6 @@
             width: 100%;
             height: 100%;
             position: absolute;
-            /* left: 50%;
-            margin-left: -384px;
-            top: 50%;
-            margin-top: -276px; */
         }
     </style>
 
@@ -70,11 +66,13 @@
                 xhr.responseType = 'arraybuffer';
                 //Download progress
                 xhr.addEventListener("progress", function (evt) {
+                    let percentComplete = 1;
                     if (evt.lengthComputable) {
-                        var percentComplete = evt.loaded / evt.total;
-                        elem.value = Math.floor(percentComplete * 100);
-                    } else if (evt.loaded)
-                        console.log('downloaded:', evt.loaded);
+                        percentComplete = evt.loaded / evt.total;
+                    } else if (evt.loaded) {
+                        percentComplete = evt.loaded / 3467246;
+                    }
+                    elem.value = Math.floor(percentComplete * 100);
                 }, false);
                 return xhr;
             }
