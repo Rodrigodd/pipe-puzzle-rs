@@ -5,7 +5,15 @@
     <link rel="icon"
         href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAqFJREFUaIHt2TtrFFEYxvHfmpisMV7xBtHCFBFRsVMLFQW1sLBIJaQwYO0X0EIFQRRbSSVY2ChBLEUbwY8gXoKFpaBITKIxwWTXYkyyMzuZnd2dyW4gf5hi5rz7nuc5tzlzlvZkCCWUa12dTVbUgc1N5ojjIAppAlMFVXAYl3AR/dglMJEPfWo2T9oeOIF7ON2cojq5hguJETWHUBEjuKL+3loRkgzswQscT/x1T8aKYPb/lYLlDGzCKxwJPS3gpKBbj2GHfPrlER6mC40zsA5PRMUfwA3BNG4j4gwMC1aaJc7iDjbkLyhEUTAWlqOsEDVQxK3Qk6O4i64slaWkiN7kkKiBYexbvOvBfdXiC4Le6JbtHJjDZH0/iRoYDN0NYWckogtb5fP6aqAxKg1swZlQssGY6G2Cad4mVEo5hPWLdwPYHYnu1VbiCcvpC5Xsj4nuzlVLQ1QaCLf39khkQdu1PmFJ4faNrjxtKJ62lZWeZj9o6qecUFaqP13+BqYxg78aEliL/AzMYgLzudWAvAxMC7YEScMlDTOYSigvNP9RH1/pRIa5fiWHZGugJF78D7zGmKB3avElfZXZGphWPVHf4iZ+ZlrTItkamIncf8V1/M60lhDZvchKgqWykqdyFU+WPRC34nysenIb71NkG8RlL/EpMa7qk7Jx4gxUj/tn+JAi2wB4Uztw5bcS6RjTYVKh9hBvVwOj5o2mCVz1u9E1A61mzUCrSb8KLbdRqyxvAZ2C87e9OBUqeYfHTWYfr3pyFd/wGc+bzI7gsKRkpf996TRururgpsFUC+LP41xMRI/6D7T+qN6ZwgN8R4Ynq0tzoF9gIspmbKwz65T4L6kRCwYyY9WvQmsGWs2agVaz6g0sLaPlZc7Ryg295LLMlcg/HERrgSqYvrQAAAAASUVORK5CYII=" />
     <style>
+        html {
+            heigth: 100%;
+            margin: 0;
+        }
         body {
+            height: 100%;
+            margin: 0;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
             background-image: linear-gradient(#001000, #002000);
         }
 
@@ -35,13 +43,17 @@
             appearance: none;
         }
 
-        progress[value]::-webkit-progress-bar {
+        progress[value]::-webkit-progress-bar, progress {
             background-color: #000800;
-            border-radius: 2px;
+            border-radius: 0px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25) inset;
         }
 
         progress[value]::-webkit-progress-value {
+            background-color: #00ff00;
+        }
+
+        progress[value]::-moz-progress-bar {
             background-color: #00ff00;
         }
 
@@ -90,7 +102,7 @@
 <body oncontextmenu="return false">
     <div class="centered">
         <canvas id="main_canvas" tabindex="0" width="768" height="553"></canvas>
-        <progress id="loading" max="100" value="0"></progress>
+        <progress id="loading" max="100" value="50"></progress>
     </div>
 </body>
 
