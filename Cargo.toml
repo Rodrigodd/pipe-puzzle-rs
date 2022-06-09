@@ -22,15 +22,16 @@ webgl = ["sprite-render/webgl"]
 
 [dependencies]
 
-cfg-if = "0.1"
+cfg-if = "1"
 sprite-render = { version = "0.1", path = "../sprite-render-rs" }
-audio-engine = { version = "0.1", path = "../audio-engine"}
-winit = "0.22"
+audio-engine = { git = "https://github.com/Rodrigodd/audio-engine.git", rev = "4b0796e7374be6dd3e49a0352113e1a3c26387e0" }
+winit = "0.26"
 rand = { version = "0.7", features = ["small_rng"] }
 image = { version = "0.23", default-features = false, features = ["png"] }
 ezing = "0.2.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-logger = "0.2"
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
 wasm-timer = "0.2"
@@ -48,6 +49,8 @@ features = [
 rect_packer = "0.2"
 image = { version = "0.23", default-features = false, features = ["png"] }
 
+[patch.crates-io]
+cpal = { git = "https://github.com/RustAudio/cpal.git", rev = "32cee3949b802038bb368c9c408af81650873d80" }
 
 ## set opt-level of the below crates to faster png file loading in debug build
 

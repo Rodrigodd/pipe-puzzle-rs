@@ -1,5 +1,5 @@
 use audio_engine::SoundSource;
-use std::sync::atomic::{ AtomicBool, Ordering };
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 // Play the intro once,
@@ -42,10 +42,9 @@ impl<T: SoundSource, S: SoundSource> SoundSource for WithIntro<T, S> {
             } else {
                 len += self.music.write_samples(&mut buffer[len..]);
                 len
-            }
+            };
         }
     }
-
 }
 
 /// When slow_down is true, the sound will slow down, and stop.
@@ -102,21 +101,23 @@ impl<T: SoundSource> SoundSource for SlowDown<T> {
                     let mut len = self.inner.write_samples(&mut self.in_buffer);
                     while len < self.in_buffer.len() {
                         self.inner.reset();
-                        len += self.inner.write_samples(&mut self.in_buffer[len..]);                        
+                        len += self.inner.write_samples(&mut self.in_buffer[len..]);
                     }
                 }
                 let t = self.iter.fract();
                 let j = self.iter as usize * channels;
                 for c in 0..channels {
-                    buffer[i + c] = (self.in_buffer[j + c] as f32 * t + self.in_buffer[j + c + channels] as f32 * (1.0-t)) as i16;
+                    buffer[i + c] = (self.in_buffer[j + c] as f32 * t
+                        + self.in_buffer[j + c + channels] as f32 * (1.0 - t))
+                        as i16;
                 }
                 self.iter += 1.0 * self.speed;
-                self.speed -= 1.0/( 0.5 * self.sample_rate() as f32 ) * (1.0 - self.speed).max(0.05);
+                self.speed -=
+                    1.0 / (0.5 * self.sample_rate() as f32) * (1.0 - self.speed).max(0.05);
                 i += channels;
             }
-            
+
             buffer.len()
         }
     }
-
 }

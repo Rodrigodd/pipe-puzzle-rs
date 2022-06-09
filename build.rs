@@ -130,7 +130,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     for (path, rects) in sprites.iter() {
-        let image = image::open(path).unwrap().to_rgba();
+        let image = image::open(path).unwrap().to_rgba8();
 
         for (name, rect, packed) in rects.iter() {
             eprintln!("copying {}...", name);

@@ -1,9 +1,9 @@
 #![allow(clippy::needless_range_loop)]
 
 use audio_engine::{Sound, WavDecoder};
-use sprite_render::{SpriteInstance, SpriteRender, Camera};
+use sprite_render::{Camera, SpriteInstance, SpriteRender};
 
-use winit::dpi::PhysicalSize;
+use winit::{dpi::PhysicalSize, window::WindowId};
 
 use rand::seq::index::sample;
 use rand::Rng;
@@ -1012,11 +1012,18 @@ pub struct Game<R: Rng, S: SpriteRender> {
     in_menu: bool,
 }
 impl<R: Rng, S: SpriteRender> Game<R, S> {
-    pub fn new(rng: R, music: Sound, slow_down_effect: Arc<AtomicBool>, camera: Camera, mut render: S) -> Self {
+    pub fn new(
+        rng: R,
+        music: Sound,
+        slow_down_effect: Arc<AtomicBool>,
+        camera: Camera,
+        mut render: S,
+    ) -> Self {
         let texture = {
-            let image = image::load_from_memory(include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png")))
-                .unwrap()
-                .to_rgba();
+            let image =
+                image::load_from_memory(include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png")))
+                    .unwrap()
+                    .to_rgba8();
             render.new_texture(
                 image.width(),
                 image.height(),
@@ -1059,7 +1066,9 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
     }
 
     pub fn update(&mut self, dt: f32, input: &Input) {
-        let (mouse_x, mouse_y) = self.camera.position_to_word_space(input.mouse_x, input.mouse_y);
+        let (mouse_x, mouse_y) = self
+            .camera
+            .position_to_word_space(input.mouse_x, input.mouse_y);
 
         self.music_button.mouse_input(mouse_x, mouse_y);
         self.audio_button.mouse_input(mouse_x, mouse_y);
@@ -1102,7 +1111,8 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
                         .play();
                 }
             }
-            #[cfg(not(target_arch = "wasm32"))] {
+            #[cfg(not(target_arch = "wasm32"))]
+            {
                 self.close_button.mouse_input(mouse_x, mouse_y);
                 self.close_button.update(dt);
                 if input.mouse_left_state == 3 && self.close_button.is_over {
@@ -1139,18 +1149,18 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
         }
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, window_id: WindowId) {
         let sprites = self.get_sprites();
         self.render
-            .render()
+            .render(window_id)
             .clear_screen(&[0.0f32, 0.25, 0.0, 1.0])
             .draw_sprites(&mut self.camera, &sprites)
             .finish();
     }
 
-    pub fn resize(&mut self, size: PhysicalSize<u32>) {
+    pub fn resize(&mut self, size: PhysicalSize<u32>, window_id: WindowId) {
         self.camera.resize(size.width, size.height);
-        self.render.resize(size.width, size.height);
+        self.render.resize(window_id, size.width, size.height);
         self.update_layout();
     }
 
@@ -1162,18 +1172,26 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
                 if prop > 1280.0 / 720.0 {
                     self.camera.set_position(0.0, 0.0);
                 } else if prop > 1280.0 / 720.0 / 2.0 + 0.5 {
-                    self.camera.set_position(-self.camera.width() as f32 / 2.0 + 1.1 * 1280.0 / 720.0, 0.0);
+                    self.camera.set_position(
+                        -self.camera.width() as f32 / 2.0 + 1.1 * 1280.0 / 720.0,
+                        0.0,
+                    );
                 } else {
-                    self.camera.set_position(self.camera.width() as f32 / 2.0 - 1.1, 0.0);
+                    self.camera
+                        .set_position(self.camera.width() as f32 / 2.0 - 1.1, 0.0);
                 }
             } else {
                 // portrait
                 if prop < 720.0 / 1280.0 {
                     self.camera.set_position(0.0, 0.0);
                 } else if prop < 1.0 / (1280.0 / 720.0 / 2.0 + 0.5) {
-                    self.camera.set_position(0.0, self.camera.height() as f32 / 2.0 - 1.1 * 1280.0 / 720.0);
+                    self.camera.set_position(
+                        0.0,
+                        self.camera.height() as f32 / 2.0 - 1.1 * 1280.0 / 720.0,
+                    );
                 } else {
-                    self.camera.set_position(0.0, -self.camera.height() as f32 / 2.0 + 1.1);
+                    self.camera
+                        .set_position(0.0, -self.camera.height() as f32 / 2.0 + 1.1);
                 }
             }
         } else {
@@ -1190,12 +1208,20 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
         } else {
             let right_side = width / 2.0 + self.camera.get_position().0;
             if prop > 1.0 {
-                self.music_button.sprite.set_position(right_side - 0.15, 0.95);
-                self.audio_button.sprite.set_position(right_side - 0.35, 0.95);
+                self.music_button
+                    .sprite
+                    .set_position(right_side - 0.15, 0.95);
+                self.audio_button
+                    .sprite
+                    .set_position(right_side - 0.35, 0.95);
             } else {
                 let top_side = -height / 2.0 + self.camera.get_position().1;
-                self.music_button.sprite.set_position(right_side - 0.15, top_side + 0.15);
-                self.audio_button.sprite.set_position(right_side - 0.35, top_side + 0.15);
+                self.music_button
+                    .sprite
+                    .set_position(right_side - 0.15, top_side + 0.15);
+                self.audio_button
+                    .sprite
+                    .set_position(right_side - 0.35, top_side + 0.15);
             }
         }
 
@@ -1224,7 +1250,8 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
                 self.music_button.sprite.clone(),
                 self.audio_button.sprite.clone(),
                 self.start_button.sprite.clone(),
-                #[cfg(not(target_arch = "wasm32"))] self.close_button.sprite.clone()
+                #[cfg(not(target_arch = "wasm32"))]
+                self.close_button.sprite.clone(),
             ]
         } else {
             let mut vec = vec![

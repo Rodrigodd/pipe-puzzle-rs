@@ -1,16 +1,14 @@
 use std::io::Cursor;
 
 use audio_engine::{AudioEngine, OggDecoder};
-use sprite_render::{Camera, SpriteRender};
+use sprite_render::Camera;
 
 use winit::{
-    dpi::{LogicalSize, PhysicalPosition, PhysicalSize},
+    dpi::LogicalSize,
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::EventLoop,
     window::WindowBuilder,
 };
-
-use rand::Rng;
 
 mod time;
 use time::Instant;
@@ -32,14 +30,14 @@ fn main() {
     let event_loop = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("Hello world!")
-        .with_inner_size(LogicalSize::new(768.0, 553.0))
+        .with_inner_size(LogicalSize::new(768.0f32, 553.0))
         .with_visible(false);
-    
+
     #[cfg(target_arch = "wasm32")]
     let wb = {
-        use winit::platform::web::WindowBuilderExtWebSys;
         use wasm_bindgen::prelude::*;
         use wasm_bindgen::JsCast;
+        use winit::platform::web::WindowBuilderExtWebSys;
 
         let document = web_sys::window().unwrap().document().unwrap();
         let canvas = document.get_element_by_id("main_canvas").unwrap();
@@ -47,19 +45,21 @@ fn main() {
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .map_err(|_| ())
             .unwrap();
-        
+
         wb.with_canvas(Some(canvas))
     };
 
+    let window = wb.build(&event_loop).unwrap();
+
     // create the SpriteRender
-    let (window, render) = {
+    let render = {
         cfg_if::cfg_if! {
             if #[cfg(feature = "opengl")] {
-                sprite_render::GLSpriteRender::new(wb, &event_loop, true)
+                sprite_render::GLSpriteRender::new(&window, true).unwrap()
             } else if #[cfg(feature = "webgl")] {
-                sprite_render::WebGLSpriteRender::new(wb, &event_loop)
+                sprite_render::WebGLSpriteRender::new(&window)
             } else {
-                (wb.build(&event_loop).unwrap(), sprite_render::EmptySpriteRender)
+                ()
             }
         }
     };
@@ -68,7 +68,9 @@ fn main() {
     let music = audio_effect::SlowDown::new(music);
     let slow_down_ref = music.slow_down.clone();
     let music = audio_effect::WithIntro::new(
-        OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe-intro.ogg")[..])),
+        OggDecoder::new(Cursor::new(
+            &include_bytes!("../res/sound/pipe-intro.ogg")[..],
+        )),
         music,
     );
 
@@ -94,11 +96,9 @@ fn main() {
     let mut clock = Instant::now();
     let mut frame_count = 0;
 
-    let mut cursor = PhysicalPosition::new(0.0, 0.0);
-
     let mut input = game::Input::default();
     window.set_visible(true);
-    game.resize(window.inner_size());
+    game.resize(window.inner_size(), window.id());
     event_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Poll;
         match event {
@@ -118,12 +118,11 @@ fn main() {
                     }
                 }
                 WindowEvent::CursorMoved { position, .. } => {
-                    cursor = position;
-                    input.mouse_x = cursor.x as f32;
-                    input.mouse_y = cursor.y as f32;
+                    input.mouse_x = position.x as f32;
+                    input.mouse_y = position.y as f32;
                 }
                 WindowEvent::Resized(size) => {
-                    game.resize(size);
+                    game.resize(size, window_id);
                 }
                 _ => (),
             },
@@ -132,11 +131,7 @@ fn main() {
                 game.update(1.0 / 60.0, &input);
                 #[cfg(target_arch = "wasm32")]
                 {
-                    unsafe {
-                        // Wasm is single-thread, so this never will be a poblem (hopefully)
-                        &mut *(audio_engine() as *const _ as *mut AudioEngine)
-                    }
-                    .update();
+                    audio_engine().resume();
                 }
                 input.update();
                 window.request_redraw();
@@ -150,7 +145,7 @@ fn main() {
                     clock = Instant::now();
                     window.set_title(&format!("PipeMania | {:9.2} FPS", 60.0 / elapsed));
                 }
-                game.render();
+                game.render(window_id);
             }
             _ => (),
         }

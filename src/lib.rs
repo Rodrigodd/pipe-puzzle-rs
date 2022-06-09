@@ -9,6 +9,7 @@ mod wasm {
     #[wasm_bindgen]
     pub fn run() {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
+        wasm_logger::init(wasm_logger::Config::new("trace".parse().unwrap()));
         super::main();
     }
 }
