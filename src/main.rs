@@ -64,13 +64,14 @@ fn main() {
         }
     };
 
-    let music = OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..]));
+    let music = OggDecoder::new(Cursor::new(&include_bytes!("../res/sound/pipe.ogg")[..])).unwrap();
     let music = audio_effect::SlowDown::new(music);
     let slow_down_ref = music.slow_down.clone();
     let music = audio_effect::WithIntro::new(
         OggDecoder::new(Cursor::new(
             &include_bytes!("../res/sound/pipe-intro.ogg")[..],
-        )),
+        ))
+        .unwrap(),
         music,
     );
 

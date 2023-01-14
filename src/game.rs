@@ -135,7 +135,7 @@ impl Pipe {
         }
         if play_sound {
             crate::audio_engine()
-                .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)))
+                .new_sound(WavDecoder::new(Cursor::new(sounds::CLICK)).unwrap())
                 .unwrap()
                 .play();
         }
@@ -780,7 +780,7 @@ impl<R: Rng> GameBoard<R> {
         self.win_sprite.set_color([255, 255, 255, 255]);
         if self.sound_effects {
             crate::audio_engine()
-                .new_sound(WavDecoder::new(Cursor::new(sounds::WHOOSH)))
+                .new_sound(WavDecoder::new(Cursor::new(sounds::WHOOSH)).unwrap())
                 .unwrap()
                 .play();
         }
@@ -1106,7 +1106,7 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
                 self.board.reset();
                 if self.board.sound_effects {
                     crate::audio_engine()
-                        .new_sound(WavDecoder::new(Cursor::new(sounds::CONFIRM)))
+                        .new_sound(WavDecoder::new(Cursor::new(sounds::CONFIRM)).unwrap())
                         .unwrap()
                         .play();
                 }
@@ -1128,7 +1128,7 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
                 self.update_layout();
                 if self.board.sound_effects {
                     crate::audio_engine()
-                        .new_sound(WavDecoder::new(Cursor::new(sounds::NEGATE)))
+                        .new_sound(WavDecoder::new(Cursor::new(sounds::NEGATE)).unwrap())
                         .unwrap()
                         .play();
                 }

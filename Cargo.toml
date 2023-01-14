@@ -24,8 +24,9 @@ webgl = ["sprite-render/webgl"]
 
 cfg-if = "1"
 sprite-render = { version = "0.1", path = "../sprite-render-rs" }
-audio-engine = { git = "https://github.com/Rodrigodd/audio-engine.git", rev = "4b0796e7374be6dd3e49a0352113e1a3c26387e0" }
 winit = "0.26"
+# audio-engine = { path = "../audio-engine" }
+audio-engine = "0.4.2"
 rand = { version = "0.7", features = ["small_rng"] }
 image = { version = "0.23", default-features = false, features = ["png"] }
 ezing = "0.2.1"
