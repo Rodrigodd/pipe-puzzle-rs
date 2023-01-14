@@ -1,5 +1,5 @@
 use super::atlas::NUMBERS;
-use sprite_render::SpriteInstance;
+use sprite_render::{SpriteInstance, TextureId};
 
 pub fn number_to_sprites(
     number: u32,
@@ -8,7 +8,7 @@ pub fn number_to_sprites(
     scale: f32,
     color: [u8; 4],
     center: bool,
-    texture: u32,
+    texture: TextureId,
 ) -> Vec<SpriteInstance> {
     let string = number.to_string();
     let mut sprites = Vec::with_capacity(string.len());

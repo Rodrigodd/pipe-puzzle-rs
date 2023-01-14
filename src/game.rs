@@ -1,7 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 
 use audio_engine::{Sound, WavDecoder};
-use sprite_render::{Camera, SpriteInstance, SpriteRender};
+use sprite_render::{Camera, SpriteInstance, SpriteRender, Texture, TextureId};
 
 use winit::{dpi::PhysicalSize, window::WindowId};
 
@@ -70,7 +70,7 @@ struct Pipe {
     target_color: u16,
 }
 impl Pipe {
-    fn new(x: f32, y: f32, size: f32, texture: u32, kind: u8, dir: u8) -> Self {
+    fn new(x: f32, y: f32, size: f32, texture: TextureId, kind: u8, dir: u8) -> Self {
         Self {
             dir,
             kind,
@@ -189,7 +189,7 @@ struct GameBoard<R: Rng> {
     number_regions: u16,
     color_pool: Vec<u16>,
     number_colors: u16,
-    texture: u32,
+    texture: TextureId,
     win_anim: f32,
     lose_anim: f32,
     win_sprite: SpriteInstance,
@@ -213,7 +213,12 @@ struct GameBoard<R: Rng> {
     rng: R,
 }
 impl<R: Rng> GameBoard<R> {
-    pub fn new(texture: u32, rng: R, music: Sound, slow_down_effect: Arc<AtomicBool>) -> Self {
+    pub fn new(
+        texture: TextureId,
+        rng: R,
+        music: Sound,
+        slow_down_effect: Arc<AtomicBool>,
+    ) -> Self {
         let mut highlight_sprite =
             SpriteInstance::new(-100.0, 0.0, 1.0, 1.0, texture, atlas::BLANCK);
         highlight_sprite.set_color([255, 255, 255, 64]);
@@ -1024,12 +1029,10 @@ impl<R: Rng, S: SpriteRender> Game<R, S> {
                 image::load_from_memory(include_bytes!(concat!(env!("OUT_DIR"), "/atlas.png")))
                     .unwrap()
                     .to_rgba8();
-            render.new_texture(
-                image.width(),
-                image.height(),
-                image.into_raw().as_slice(),
-                true,
-            )
+            Texture::new(image.width(), image.height())
+                .data(image.into_raw().as_slice())
+                .create(&mut render)
+                .unwrap()
         };
         Self {
             camera,

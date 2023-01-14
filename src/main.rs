@@ -55,11 +55,11 @@ fn main() {
     let render = {
         cfg_if::cfg_if! {
             if #[cfg(feature = "opengl")] {
-                sprite_render::GLSpriteRender::new(&window, true).unwrap()
+                sprite_render::GlSpriteRender::new(&window, true).unwrap()
             } else if #[cfg(feature = "webgl")] {
                 sprite_render::WebGLSpriteRender::new(&window)
             } else {
-                ()
+                sprite_render::NoopSpriteRender
             }
         }
     };
