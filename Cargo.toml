@@ -50,9 +50,6 @@ features = [
 rect_packer = "0.2"
 image = { version = "0.23", default-features = false, features = ["png"] }
 
-[patch.crates-io]
-cpal = { git = "https://github.com/RustAudio/cpal.git", rev = "32cee3949b802038bb368c9c408af81650873d80" }
-
 ## set opt-level of the below crates to faster png file loading in debug build
 
 [profile.dev.package.image]
